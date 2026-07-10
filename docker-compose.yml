@@ -1,0 +1,225 @@
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks:
+    - feature-flags-net
+
+services:
+  # ─── Databases ───────────────────────────────────────────────
+
+  auth-db:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: auth_pass
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+      - ./auth-service/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_user -d auth_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    ports:
+      - "5433:5432"
+
+  flag-db:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: flag_db
+      POSTGRES_USER: flag_user
+      POSTGRES_PASSWORD: flag_pass
+    volumes:
+      - flag-db-data:/var/lib/postgresql/data
+      - ./flag-service/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flag_user -d flag_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    ports:
+      - "5434:5432"
+
+  targeting-db:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: targeting_db
+      POSTGRES_USER: targeting_user
+      POSTGRES_PASSWORD: targeting_pass
+    volumes:
+      - targeting-db-data:/var/lib/postgresql/data
+      - ./targeting-service/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U targeting_user -d targeting_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    ports:
+      - "5435:5432"
+
+  redis:
+    <<: *service-defaults
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    ports:
+      - "6379:6379"
+
+  localstack:
+    <<: *service-defaults
+    image: localstack/localstack:3
+    environment:
+      SERVICES: sqs,dynamodb
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: AKIAIOSFODNN7EXAMPLE
+      AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+    volumes:
+      - localstack-data:/var/lib/localstack
+      - ./init:/etc/localstack/init/ready.d
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    ports:
+      - "4566:4566"
+
+  # ─── Microsserviços ─────────────────────────────────────────
+
+  auth-service:
+    <<: *service-defaults
+    build: ./auth-service
+    environment:
+      PORT: "8001"
+      DATABASE_URL: postgres://auth_user:auth_pass@auth-db:5432/auth_db
+      MASTER_KEY: ${AUTH_MASTER_KEY:-admin-secreto-123}
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    healthcheck:
+      test: wget -qO- http://127.0.0.1:8001/health || exit 1
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    ports:
+      - "8001:8001"
+
+  flag-service:
+    <<: *service-defaults
+    build: ./flag-service
+    environment:
+      PORT: "8002"
+      DATABASE_URL: postgres://flag_user:flag_pass@flag-db:5432/flag_db
+      AUTH_SERVICE_URL: http://auth-service:8001
+    depends_on:
+      flag-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: wget -qO- http://127.0.0.1:8002/health || exit 1
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    ports:
+      - "8002:8002"
+
+  targeting-service:
+    <<: *service-defaults
+    build: ./targeting-service
+    environment:
+      PORT: "8003"
+      DATABASE_URL: postgres://targeting_user:targeting_pass@targeting-db:5432/targeting_db
+      AUTH_SERVICE_URL: http://auth-service:8001
+    depends_on:
+      targeting-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: wget -qO- http://127.0.0.1:8003/health || exit 1
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    ports:
+      - "8003:8003"
+
+  evaluation-service:
+    <<: *service-defaults
+    build: ./evaluation-service
+    environment:
+      PORT: "8004"
+      REDIS_URL: redis://redis:6379/0
+      FLAG_SERVICE_URL: http://flag-service:8002
+      TARGETING_SERVICE_URL: http://targeting-service:8003
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: AKIAIOSFODNN7EXAMPLE
+      AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+      AWS_SQS_URL: http://localstack:4566/000000000000/evaluation-events
+      SERVICE_API_KEY: ${SERVICE_API_KEY:-tm_key_dev}
+    depends_on:
+      redis:
+        condition: service_healthy
+      flag-service:
+        condition: service_healthy
+      targeting-service:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    healthcheck:
+      test: wget -qO- http://127.0.0.1:8004/health || exit 1
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    ports:
+      - "8004:8004"
+
+  analytics-service:
+    <<: *service-defaults
+    build: ./analytics-service
+    environment:
+      PORT: "8005"
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: AKIAIOSFODNN7EXAMPLE
+      AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+      AWS_SQS_URL: http://localstack:4566/000000000000/evaluation-events
+      AWS_DYNAMODB_TABLE: evaluation_events
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AUTH_SERVICE_URL: http://auth-service:8001
+    depends_on:
+      localstack:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: wget -qO- http://127.0.0.1:8005/health || exit 1
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    ports:
+      - "8005:8005"
+
+networks:
+  feature-flags-net:
+    driver: bridge
+
+volumes:
+  auth-db-data:
+  flag-db-data:
+  targeting-db-data:
+  redis-data:
+  localstack-data:
