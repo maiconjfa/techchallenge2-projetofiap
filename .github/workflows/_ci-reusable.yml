@@ -196,7 +196,7 @@ jobs:
       # Relatorio completo para visibilidade (nao bloqueia):
       #######################################################################
       - name: Trivy FS - relatorio completo (visibilidade)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         continue-on-error: true
         with:
           scan-type: fs
@@ -208,7 +208,7 @@ jobs:
       # Bloqueio: qualquer vulnerabilidade CRITICA nas dependencias/codigo
       # tambem captura segredos expostos no fonte.
       - name: Trivy FS - GATE CRITICAL (bloqueia pipeline)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: fs
           scan-ref: ${{ inputs.working-directory }}
@@ -281,7 +281,7 @@ jobs:
       # Container Scan - vulnerabilidades CRITICAL na IMAGEM bloqueiam
       #####################################################################
       - name: Trivy Image - GATE CRITICAL (bloqueia pipeline)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: image
           image-ref: ${{ env.REGISTRY }}/${{ inputs.ecr-repository }}:${{ steps.vars.outputs.image_tag }}
