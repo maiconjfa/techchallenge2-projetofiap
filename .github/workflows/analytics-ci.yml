@@ -13,11 +13,13 @@ on:
     paths:
       - "analytics-service/**"
       - ".github/workflows/analytics-ci.yml"
+      - ".github/workflows/_ci-reusable.yml"
   pull_request:
     branches: [main]
     paths:
       - "analytics-service/**"
       - ".github/workflows/analytics-ci.yml"
+      - ".github/workflows/_ci-reusable.yml"
   workflow_dispatch:
 
 permissions:

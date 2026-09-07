@@ -13,11 +13,13 @@ on:
     paths:
       - "auth-service/**"
       - ".github/workflows/auth-ci.yml"
+      - ".github/workflows/_ci-reusable.yml"
   pull_request:
     branches: [main]
     paths:
       - "auth-service/**"
       - ".github/workflows/auth-ci.yml"
+      - ".github/workflows/_ci-reusable.yml"
   workflow_dispatch:
 
 permissions:

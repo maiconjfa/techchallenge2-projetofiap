@@ -13,11 +13,13 @@ on:
     paths:
       - "targeting-service/**"
       - ".github/workflows/targeting-ci.yml"
+      - ".github/workflows/_ci-reusable.yml"
   pull_request:
     branches: [main]
     paths:
       - "targeting-service/**"
       - ".github/workflows/targeting-ci.yml"
+      - ".github/workflows/_ci-reusable.yml"
   workflow_dispatch:
 
 permissions:

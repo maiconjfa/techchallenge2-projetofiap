@@ -13,11 +13,13 @@ on:
     paths:
       - "flag-service/**"
       - ".github/workflows/flag-ci.yml"
+      - ".github/workflows/_ci-reusable.yml"
   pull_request:
     branches: [main]
     paths:
       - "flag-service/**"
       - ".github/workflows/flag-ci.yml"
+      - ".github/workflows/_ci-reusable.yml"
   workflow_dispatch:
 
 permissions:
