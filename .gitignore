@@ -65,3 +65,4 @@ terraform/terraform.tfvars
 ###############################################################################
 gitops/base/secrets.yaml
 kubeconfig*
+/evaluation-service/evaluation-service
