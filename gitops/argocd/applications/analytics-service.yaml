@@ -1,0 +1,37 @@
+###############################################################################
+# Application ArgoCD: analytics-service
+#
+# O ArgoCD monitora gitops/apps/analytics-service neste repositorio e sincroniza
+# automaticamente qualquer mudanca de tag gerada pelo pipeline de CI.
+###############################################################################
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: analytics-service
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/maiconjfa/techchallenge2-projetofiap.git
+    targetRevision: main
+    path: gitops/apps/analytics-service
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: feature-flags
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 2m

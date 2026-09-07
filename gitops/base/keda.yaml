@@ -1,0 +1,35 @@
+###############################################################################
+# KEDA: escala o analytics-service pela profundidade da fila SQS.
+#
+# Requisitos:
+#   - KEDA instalado no cluster (ver README - helm/kubectl)
+#   - TriggerAuthentication usa pod identity AWS: as credenciais vêm da role
+#     do node (provisionada pelo modulo EKS com permissoes SQS)
+###############################################################################
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: analytics-service-scaledobject
+  namespace: feature-flags
+spec:
+  scaleTargetRef:
+    name: analytics-service
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  triggers:
+    - type: aws-sqs-queue
+      authenticationRef:
+        name: keda-trigger-auth-aws-credentials
+      metadata:
+        queueURL: https://sqs.us-east-1.amazonaws.com/248530551510/tooglemaster-evaluation-events-queue
+        queueLength: "5"
+        awsRegion: us-east-1
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-trigger-auth-aws-credentials
+  namespace: feature-flags
+spec:
+  podIdentity:
+    provider: aws

@@ -1,0 +1,14 @@
+# A tag abaixo e atualizada automaticamente pelo pipeline de CI
+# (job update-gitops) apos cada push na main.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: feature-flags
+
+resources:
+  - deployment.yaml
+  - service.yaml
+
+images:
+  - name: 248530551510.dkr.ecr.us-east-1.amazonaws.com/togglemaster-flag
+    newTag: v1.0.0

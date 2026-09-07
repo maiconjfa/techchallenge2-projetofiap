@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: feature-flags
+data:
+  # Service ports
+  AUTH_PORT: "8001"
+  FLAG_PORT: "8002"
+  TARGETING_PORT: "8003"
+  EVAL_PORT: "8004"
+  ANALYTICS_PORT: "8005"
+
+  # Internal service URLs (Kubernetes DNS)
+  AUTH_SERVICE_URL: "http://auth-service.feature-flags.svc.cluster.local:8001"
+  FLAG_SERVICE_URL: "http://flag-service.feature-flags.svc.cluster.local:8002"
+  TARGETING_SERVICE_URL: "http://targeting-service.feature-flags.svc.cluster.local:8003"
+
+  # AWS configuration (recursos provisionados via terraform/)
+  AWS_REGION: "us-east-1"
+  AWS_DYNAMODB_TABLE: "ToggleMasterAnalytics"

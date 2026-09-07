@@ -1,0 +1,31 @@
+###############################################################################
+# CI do microsservico flag-service
+#
+# Dispara em Pull Request e Push na main (com filtro de caminhos).
+# Estagios completos de DevSecOps definidos no workflow reutilizavel:
+#   .github/workflows/_ci-reusable.yml
+###############################################################################
+name: "flag CI"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "flag-service/**"
+      - ".github/workflows/flag-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "flag-service/**"
+      - ".github/workflows/flag-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  ci:
+    name: "Pipeline flag"
+    uses: ./.github/workflows/_ci-reusable.yml
+    with:
+      service-name: flag-service
+      working-directory: flag-service
+      language: python
+      ecr-repository: togglemaster-flag

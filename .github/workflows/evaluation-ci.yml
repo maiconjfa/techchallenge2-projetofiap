@@ -1,0 +1,32 @@
+###############################################################################
+# CI do microsservico evaluation-service
+#
+# Dispara em Pull Request e Push na main (com filtro de caminhos).
+# Estagios completos de DevSecOps definidos no workflow reutilizavel:
+#   .github/workflows/_ci-reusable.yml
+###############################################################################
+name: "evaluation CI"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "evaluation-service/**"
+      - ".github/workflows/evaluation-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "evaluation-service/**"
+      - ".github/workflows/evaluation-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  ci:
+    name: "Pipeline evaluation"
+    uses: ./.github/workflows/_ci-reusable.yml
+    with:
+      service-name: evaluation-service
+      working-directory: evaluation-service
+      language: go
+      go-version-file: evaluation-service/go.mod
+      ecr-repository: togglemaster-evaluation

@@ -1,0 +1,31 @@
+###############################################################################
+# CI do microsservico targeting-service
+#
+# Dispara em Pull Request e Push na main (com filtro de caminhos).
+# Estagios completos de DevSecOps definidos no workflow reutilizavel:
+#   .github/workflows/_ci-reusable.yml
+###############################################################################
+name: "targeting CI"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "targeting-service/**"
+      - ".github/workflows/targeting-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "targeting-service/**"
+      - ".github/workflows/targeting-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  ci:
+    name: "Pipeline targeting"
+    uses: ./.github/workflows/_ci-reusable.yml
+    with:
+      service-name: targeting-service
+      working-directory: targeting-service
+      language: python
+      ecr-repository: togglemaster-targeting

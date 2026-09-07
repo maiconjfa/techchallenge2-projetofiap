@@ -1,0 +1,353 @@
+###############################################################################
+# Pipeline Reutilizavel de CI + DevSecOps - ToggleMaster
+#
+# Chamado pelos workflows de cada microsservico (*-ci.yml).
+#
+# Estagios (jobs encadeados - qualquer falha interrompe o pipeline):
+#   1. build-test            : compila e roda testes unitarios
+#   2. lint                  : golangci-lint (Go) | flake8 + pylint (Python)
+#   3. security-scan         : SCA (Trivy fs) + SAST (gosec | bandit)
+#                              >>> REGRA DE BLOQUEIO: vulnerabilidade CRITICAL
+#                                  (ou HIGH no SAST) falha o pipeline <<<
+#   4. docker-build-scan-push: build da imagem -> Trivy image scan (CRITICAL
+#                              bloqueia) -> login ECR via OIDC -> push
+#   5. update-gitops         : atualiza images.newTag no Kustomize e faz commit
+#
+# Seguranca de credenciais: sem chaves estaticas. O job assume a role IAM
+# criada pelo modulo terraform/modules/github_oidc via federacao OIDC
+# (secret do repositorio: AWS_ROLE_ARN).
+#
+# Jobs 4 e 5 so executam em PUSH na main; Pull Requests executam 1-3.
+###############################################################################
+name: CI Reutilizavel (DevSecOps)
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: "Nome do microsservico (usado nos commits e caminhos GitOps)"
+        required: true
+        type: string
+      working-directory:
+        description: "Diretorio raiz do servico no repositorio"
+        required: true
+        type: string
+      language:
+        description: "Linguagem do servico: go ou python"
+        required: true
+        type: string
+      ecr-repository:
+        description: "Repositorio ECR de destino"
+        required: true
+        type: string
+      go-version-file:
+        description: "Caminho do go.mod (servicos Go)"
+        required: false
+        type: string
+      python-version:
+        description: "Versao Python (servicos Python)"
+        required: false
+        type: string
+        default: "3.11"
+      version-prefix:
+        description: "Prefixo semantico da imagem (gera <prefix>-<sha>)"
+        required: false
+        type: string
+        default: "v1.0.0"
+
+permissions:
+  id-token: write # federacao OIDC com a AWS
+  contents: write # commit automatico no GitOps
+
+env:
+  AWS_REGION: us-east-1
+  REGISTRY: 248530551510.dkr.ecr.us-east-1.amazonaws.com
+
+concurrency:
+  group: ci-${{ inputs.service-name }}
+  cancel-in-progress: true
+
+jobs:
+  ###########################################################################
+  # 1. Build & Unit Test
+  ###########################################################################
+  build-test:
+    name: "Build & Unit Test (${{ inputs.service-name }})"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      #######################################################################
+      # Go: build + testes unitarios
+      #######################################################################
+      - name: Setup Go
+        if: inputs.language == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ inputs.go-version-file }}
+          cache-dependency-path: ${{ inputs.working-directory }}/go.sum
+
+      - name: Build (Go)
+        if: inputs.language == 'go'
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          go build -v ./...
+          echo "BUILD_OK=true" >> "$GITHUB_ENV"
+
+      - name: Unit Tests (Go)
+        if: inputs.language == 'go'
+        working-directory: ${{ inputs.working-directory }}
+        run: go test -v ./...
+
+      #######################################################################
+      # Python: instalacao de dependencias + testes unitarios
+      #######################################################################
+      - name: Setup Python
+        if: inputs.language == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: pip
+          cache-dependency-path: ${{ inputs.working-directory }}/requirements.txt
+
+      - name: Install dependencies (Python)
+        if: inputs.language == 'python'
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Unit Tests / Syntax Check (Python)
+        if: inputs.language == 'python'
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          if compgen -G "test_*.py" >/dev/null || [ -d tests ]; then
+            pip install pytest
+            pytest -q
+          else
+            echo "Nenhum teste unitario encontrado - validando sintaxe com compileall."
+            python -m compileall -q .
+          fi
+
+  ###########################################################################
+  # 2. Linter / Static Analysis
+  ###########################################################################
+  lint:
+    name: "Lint (${{ inputs.service-name }})"
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        if: inputs.language == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ inputs.go-version-file }}
+          cache-dependency-path: ${{ inputs.working-directory }}/go.sum
+
+      - name: golangci-lint (Go)
+        if: inputs.language == 'go'
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          working-directory: ${{ inputs.working-directory }}
+          args: --timeout=5m
+
+      - name: Setup Python
+        if: inputs.language == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Install dependencies (Python)
+        if: inputs.language == 'python'
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: flake8 + pylint (Python)
+        if: inputs.language == 'python'
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          pip install flake8 pylint
+          # Erros fatais (sintaxe/imports indefinidos/etc.) BLOQUEIAM o pipeline
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # pylint em modo erros-only: convencao/estilo nao bloqueia
+          pylint . --errors-only --disable=all --enable=E
+
+  ###########################################################################
+  # 3. Security Scan (SAST & SCA)
+  #    REGRA DE BLOQUEIO: CRITICAL (SCA) / HIGH-CRITICAL (SAST) => FALHA
+  ###########################################################################
+  security-scan:
+    name: "Security Scan - SAST & SCA (${{ inputs.service-name }})"
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      #######################################################################
+      # SCA - Software Composition Analysis (dependencias)
+      # Relatorio completo para visibilidade (nao bloqueia):
+      #######################################################################
+      - name: Trivy FS - relatorio completo (visibilidade)
+        uses: aquasecurity/trivy-action@0.28.0
+        continue-on-error: true
+        with:
+          scan-type: fs
+          scan-ref: ${{ inputs.working-directory }}
+          scanners: vuln,secret,misconfig
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          format: table
+
+      # Bloqueio: qualquer vulnerabilidade CRITICA nas dependencias/codigo
+      # tambem captura segredos expostos no fonte.
+      - name: Trivy FS - GATE CRITICAL (bloqueia pipeline)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: ${{ inputs.working-directory }}
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      #######################################################################
+      # SAST - Static Application Security Testing (codigo fonte)
+      #######################################################################
+      - name: Setup Go
+        if: inputs.language == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ inputs.go-version-file }}
+
+      # gosec: issues de severidade HIGH bloqueiam (mapeamento:
+      # gosec nao possui nivel CRITICAL; HIGH equivale ao topo da escala)
+      - name: gosec - SAST Go (bloqueia HIGH+)
+        if: inputs.language == 'go'
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          set -o pipefail
+          OUT=$(mktemp)
+          go mod download
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          "$(go env GOPATH)/bin/gosec" -severity high -confidence medium -quiet -out "$OUT" ./... \
+            && echo "gosec: nenhuma vulnerabilidade HIGH encontrada." \
+            || { echo "::error::SAST gosec encontrou vulnerabilidades HIGH:"; cat "$OUT"; exit 1; }
+
+      # bandit: apenas severidade HIGH (-lll) bloqueia o pipeline
+      - name: bandit - SAST Python (bloqueia HIGH)
+        if: inputs.language == 'python'
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          pip install bandit
+          bandit -r . -lll --skip B101
+
+  ###########################################################################
+  # 4. Docker Build & Scan & Push ao ECR (apenas push na main)
+  ###########################################################################
+  docker-build-scan-push:
+    name: "Docker Build & Container Scan & Push (${{ inputs.service-name }})"
+    runs-on: ubuntu-latest
+    needs: security-scan
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      image_tag: ${{ steps.vars.outputs.image_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Define tags da imagem
+        id: vars
+        run: |
+          IMAGE_TAG="${{ inputs.version-prefix }}-${GITHUB_SHA::7}"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Imagem: ${{ env.REGISTRY }}/${{ inputs.ecr-repository }}:${IMAGE_TAG}"
+
+      - name: Docker Build
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          docker build \
+            -t "${{ env.REGISTRY }}/${{ inputs.ecr-repository }}:${{ steps.vars.outputs.image_tag }}" \
+            -t "${{ env.REGISTRY }}/${{ inputs.ecr-repository }}:latest" \
+            .
+
+      #####################################################################
+      # Container Scan - vulnerabilidades CRITICAL na IMAGEM bloqueiam
+      #####################################################################
+      - name: Trivy Image - GATE CRITICAL (bloqueia pipeline)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.REGISTRY }}/${{ inputs.ecr-repository }}:${{ steps.vars.outputs.image_tag }}
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      #####################################################################
+      # Autenticacao OIDC na AWS e push ao ECR
+      #####################################################################
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login no Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Push da imagem para o ECR
+        run: |
+          docker push "${{ env.REGISTRY }}/${{ inputs.ecr-repository }}:${{ steps.vars.outputs.image_tag }}"
+          docker push "${{ env.REGISTRY }}/${{ inputs.ecr-repository }}:latest"
+
+  ###########################################################################
+  # 5. Atualizacao Automatica do Repositorio GitOps (CD)
+  ###########################################################################
+  update-gitops:
+    name: "Update GitOps - nova tag (${{ inputs.service-name }})"
+    runs-on: ubuntu-latest
+    needs: docker-build-scan-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    # Serializa atualizacoes no GitOps entre os 5 pipelines simultaneos
+    concurrency:
+      group: gitops-update
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Instalar yq
+        run: |
+          sudo wget -q https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64 \
+            -O /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Atualizar images.newTag no Kustomize
+        run: |
+          FILE="gitops/apps/${{ inputs.service-name }}/kustomization.yaml"
+          export NEW_TAG="${{ needs.docker-build-scan-push.outputs.image_tag }}"
+          echo "Atualizando ${FILE} -> ${NEW_TAG}"
+          yq -i '.images[0].newTag = strenv(NEW_TAG)' "$FILE"
+
+      - name: Commit e Push no repositorio GitOps
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          FILE="gitops/apps/${{ inputs.service-name }}/kustomization.yaml"
+          NEW_TAG="${{ needs.docker-build-scan-push.outputs.image_tag }}"
+          git add "$FILE"
+          git diff --cached --quiet && { echo "Sem mudancas."; exit 0; }
+          git commit -m "ci(${{ inputs.service-name }}): bump image to ${NEW_TAG}"
+          git pull --rebase origin main
+          git push

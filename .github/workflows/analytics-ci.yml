@@ -1,0 +1,31 @@
+###############################################################################
+# CI do microsservico analytics-service
+#
+# Dispara em Pull Request e Push na main (com filtro de caminhos).
+# Estagios completos de DevSecOps definidos no workflow reutilizavel:
+#   .github/workflows/_ci-reusable.yml
+###############################################################################
+name: "analytics CI"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "analytics-service/**"
+      - ".github/workflows/analytics-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "analytics-service/**"
+      - ".github/workflows/analytics-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  ci:
+    name: "Pipeline analytics"
+    uses: ./.github/workflows/_ci-reusable.yml
+    with:
+      service-name: analytics-service
+      working-directory: analytics-service
+      language: python
+      ecr-repository: togglemaster-analytics

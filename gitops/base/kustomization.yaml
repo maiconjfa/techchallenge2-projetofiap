@@ -1,0 +1,21 @@
+###############################################################################
+# GitOps ToggleMaster - base compartilhada por todos os microsservicos.
+#
+# Aplicar manualmente ANTES de habilitar as Applications do ArgoCD
+# (inclui o Secret gerado por terraform/scripts/generate-k8s-secrets.sh):
+#   kubectl apply -k gitops/base
+###############################################################################
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: feature-flags
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  # Gerado a partir dos outputs do Terraform - NAO versionado com valores reais:
+  - secrets.yaml
+  - service-accounts.yaml
+  - ingress.yaml
+  - hpa.yaml
+  - keda.yaml

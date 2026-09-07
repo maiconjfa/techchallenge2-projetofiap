@@ -1,0 +1,32 @@
+###############################################################################
+# CI do microsservico auth-service
+#
+# Dispara em Pull Request e Push na main (com filtro de caminhos).
+# Estagios completos de DevSecOps definidos no workflow reutilizavel:
+#   .github/workflows/_ci-reusable.yml
+###############################################################################
+name: "auth CI"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "auth-service/**"
+      - ".github/workflows/auth-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "auth-service/**"
+      - ".github/workflows/auth-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  ci:
+    name: "Pipeline auth"
+    uses: ./.github/workflows/_ci-reusable.yml
+    with:
+      service-name: auth-service
+      working-directory: auth-service
+      language: go
+      go-version-file: auth-service/go.mod
+      ecr-repository: togglemaster-auth

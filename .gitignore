@@ -8,6 +8,8 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.venv/
+venv/
 
 # Go
 *.exe
@@ -32,4 +34,34 @@ Thumbs.db
 # Logs
 *.log
 
-.md
+session-ses_12d0.md
+
+###############################################################################
+# Terraform
+###############################################################################
+terraform/.terraform/
+terraform/argocd-install/.terraform/
+terraform/**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+terraform.tfplan
+planfile
+# Arquivos com valores reais por ambiente NAO devem ser versionados:
+terraform/terraform.tfvars
+
+###############################################################################
+# Kubernetes / GitOps
+# O Secret real e gerado a partir dos outputs do Terraform:
+#   terraform/scripts/generate-k8s-secrets.sh
+###############################################################################
+gitops/base/secrets.yaml
+kubeconfig*
