@@ -150,11 +150,11 @@ jobs:
 
       - name: golangci-lint (Go)
         if: inputs.language == 'go'
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-          working-directory: ${{ inputs.working-directory }}
-          args: --timeout=5m
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          # v2.13.2 fixa a versao (deterministico) e suporta module go >= 1.26
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.13.2
+          "$(go env GOPATH)/bin/golangci-lint" run --timeout=5m
 
       - name: Setup Python
         if: inputs.language == 'python'

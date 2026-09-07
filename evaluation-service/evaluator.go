@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"sync"
 	"time"
 )
@@ -101,19 +102,37 @@ func (a *App) fetchFromServices(flagName string) (*CombinedFlagInfo, error) {
 	}, nil
 }
 
+// sanitizeFlagName restringe o flagName a um subconjunto seguro de caracteres.
+// Alem de validar a entrada recebida, quebra o fluxo de taint para o sink
+// (URL de origem fixa flag/targeting), mitigando SSRF (gosec G704/G107).
+func sanitizeFlagName(name string) (string, error) {
+	if !flagNameRe.MatchString(name) {
+		return "", &NotFoundError{name}
+	}
+	return name, nil
+}
+
+var flagNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$`)
+
 // fetchFlag (função helper)
 func (a *App) fetchFlag(flagName string) (*Flag, error) {
-	url := fmt.Sprintf("%s/flags/%s", a.FlagServiceURL, flagName)
+	name, err := sanitizeFlagName(flagName)
+	if err != nil {
+		return nil, err
+	}
+	url := fmt.Sprintf("%s/flags/%s", a.FlagServiceURL, name)
 
 	apiKey := os.Getenv("SERVICE_API_KEY")
-	req, _ := http.NewRequest("GET", url, nil)
+	req, _ := http.NewRequest("GET", url, nil) // #nosec G704 -- SSRF mitigado: flagName validado por sanitizeFlagName e host de origem e fixo (flag/targeting-service)
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	
-	resp, err := a.HttpClient.Do(req)
+	resp, err := a.HttpClient.Do(req) // #nosec G704 -- SSRF mitigado: flagName validado por sanitizeFlagName e host de origem e fixo (flag/targeting-service)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao chamar flag-service: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, &NotFoundError{flagName}
@@ -131,16 +150,22 @@ func (a *App) fetchFlag(flagName string) (*Flag, error) {
 }
 
 func (a *App) fetchRule(flagName string) (*TargetingRule, error) {
-	url := fmt.Sprintf("%s/rules/%s", a.TargetingServiceURL, flagName)
+	name, err := sanitizeFlagName(flagName)
+	if err != nil {
+		return nil, err
+	}
+	url := fmt.Sprintf("%s/rules/%s", a.TargetingServiceURL, name)
 	apiKey := os.Getenv("SERVICE_API_KEY") // Usa a mesma chave
-	req, _ := http.NewRequest("GET", url, nil)
+	req, _ := http.NewRequest("GET", url, nil) // #nosec G704 -- SSRF mitigado: flagName validado por sanitizeFlagName e host de origem e fixo (flag/targeting-service)
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	
-	resp, err := a.HttpClient.Do(req)
+	resp, err := a.HttpClient.Do(req) // #nosec G704 -- SSRF mitigado: flagName validado por sanitizeFlagName e host de origem e fixo (flag/targeting-service)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao chamar targeting-service: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, &NotFoundError{flagName} // Não é um erro fatal
