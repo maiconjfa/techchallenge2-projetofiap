@@ -57,6 +57,10 @@ on:
         required: false
         type: string
         default: "v1.0.0"
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+        description: "ARN da role IAM assumida via OIDC (module github_oidc)"
 
 permissions:
   id-token: write # federacao OIDC com a AWS
