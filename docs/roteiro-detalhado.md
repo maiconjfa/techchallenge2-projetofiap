@@ -131,59 +131,42 @@ Dois detalhes que **já quebraram o CI** e viraram resposta de banca:
 
 > **Pré-requisito:** tudo verde (seção 1) e terminal na raiz do repo, branch `main`.
 
-**Cena principal — SCA bloqueando (vermelho → verde, tudo manual):**
-
-> O bloqueio é real: o portão SCA é `GATE CRITICAL/HIGH` e `golang.org/x/crypto v0.20.0` carrega o
-> **CVE-2026-56854 (HIGH)** — o `auth-service` é o único dos 5 sem HIGHs na versão saudável, então
-> o downgrade dele é o que pára o pipeline.
-
-**Passo 0 — preparar** (sincroniza com o CI, que pode ter commitado bump no GitOps):
+**Cena principal — SCA bloqueando (vermelho → verde):**
 
 ```bash
-git pull --rebase origin main
+bash docs/scripts/provocar-sca.sh
 ```
 
-**Passo 1 — commit manual do downgrade (o pipeline fica VERMELHO):**
+O que ele faz: faz **downgrade** da dependência `golang.org/x/crypto` para **v0.20.0**, que tem o
+**CVE-2026-56854 (HIGH)**, comita `demo(sca): ...`, faz push (via SSH) e acompanha o run ao vivo.
 
-```bash
-# Regressa golang.org/x/crypto para v0.20.0 (vulnerável) e regenera o go.sum:
-docker run --rm -v "$PWD":/src -w /src/auth-service golang:1.26-alpine \
-  sh -c "go mod edit -require=golang.org/x/crypto@v0.20.0 && go mod tidy"
+> **Guarda:** se já existir um `demo(sca)` pendente em `origin/main` (run vermelho), rode primeiro
+> o `reverter-sca.sh` — o script não provoca duas vezes com demo aberto.
 
-git diff --stat                      # confere: só go.mod e go.sum mudaram
-git add auth-service/go.mod auth-service/go.sum
-git commit -m "demo(sca): golang.org/x/crypto v0.20.0 (CVE-2026-56854 HIGH)"
-git push origin main                 # dispara o pipeline do auth-service
-```
-
-O que esperar (após ~4–6 min): run **parado no estágio 3**, passo
-`Trivy FS - GATE CRITICAL/HIGH`:
+O que esperar: após ~4–6 min o run fica **verde até o estágio 3** e **parado no
+`Security Scan`**:
 
 ```text
 Security Scan -> Trivy FS - GATE CRITICAL/HIGH (CVE-2026-56854)
 Total: 1 (UNKNOWN: 0, LOW: 0, MEDIUM: 0, HIGH: 1, CRITICAL: 0)
 golang.org/x/crypto (golang)
-╰─ CVE-2026-56854 (HIGH) → fix: 0.56.0
+╰─ CVE-2026-56854 (HIGH) → fix: 0.55.0
 ```
 
 > **Para falar:** "O SCA comparou o `go.mod` com o banco de CVEs e achou uma vulnerabilidade
 > **HIGH**. Pela regra do portão **CRITICAL/HIGH**, o pipeline parou aqui: não gerou imagem, não
 > atualizou o GitOps."
 
-**Passo 2 — revert manual (o mesmo pipeline passa):**
+Correção (o mesmo pipeline passa):
 
 ```bash
-git pull --rebase origin main        # main pode ter avançado (bot do GitOps)
-
-SHA_DEMO=$(git log origin/main --pretty=%H --grep='demo(sca)' -1)
-git revert --no-edit "$SHA_DEMO"     # desfaz o downgrade (volta a versão saudável)
-git push origin main                 # novo run: verde até o fim (inclui job 5 Update GitOps)
+bash docs/scripts/reverter-sca.sh
 ```
 
-> **Para falar:** "A correção é um `git revert`. Porta fechada existe, mas a saída é rápida."
+Faz `git revert` do commit `demo(sca)` e acompanha o run — agora **verde** até o final (inclui o
+job 5 `Update GitOps`).
 
-> **Dica:** os scripts `docs/scripts/provocar-sca.sh` + `reverter-sca.sh` são o **atalho**
-> automatizado da mesma cena (commit + push + revert); servem de ensaio rápido antes da gravação.
+> **Para falar:** "A correção é um `git revert`. Porta fechada existe, mas a saída é rápida."
 
 **Cenas opcionais (se o tempo permitir)** — mesma mecânica:
 
