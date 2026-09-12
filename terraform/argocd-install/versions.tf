@@ -29,7 +29,8 @@ terraform {
 
 provider "kustomization" {
   kubeconfig_path = pathexpand(var.kubeconfig_path)
-  context         = var.cluster_name
+  # aws eks update-kubeconfig grava o contexto como ARN completo, nao como nome curto.
+  context         = "arn:aws:eks:us-east-1:248530551510:cluster/${var.cluster_name}"
 }
 
 module "argocd" {

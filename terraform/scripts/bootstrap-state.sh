@@ -42,7 +42,7 @@ else
 fi
 
 echo "==> Bloqueio de acesso publico..."
-aws s3api put-public-block \
+aws s3api put-public-access-block \
   --bucket "${BUCKET}" \
   --public-access-block-configuration \
   BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true

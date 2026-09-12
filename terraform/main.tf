@@ -88,7 +88,7 @@ module "rds" {
 
   vpc_id            = module.networking.vpc_id
   identifier_prefix = var.project_name
-  engine_version    = "16.4"
+  engine_version    = "16.15"
   instance_class    = var.db_instance_class
   allocated_storage = var.db_allocated_storage
   username          = var.db_username

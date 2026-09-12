@@ -34,7 +34,7 @@ resource "aws_ecr_lifecycle_policy" "this" {
           countUnit   = "days"
           countNumber = 7
         }
-        action = [{ type = "expire" }]
+        action = { type = "expire" }
       },
       {
         rulePriority = 2
@@ -45,7 +45,7 @@ resource "aws_ecr_lifecycle_policy" "this" {
           countType      = "imageCountMoreThan"
           countNumber    = var.image_retention_count
         }
-        action = [{ type = "expire" }]
+        action = { type = "expire" }
       }
     ]
   })

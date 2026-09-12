@@ -11,7 +11,7 @@ variable "identifier_prefix" {
 variable "engine_version" {
   description = "Versao major do PostgreSQL."
   type        = string
-  default     = "16.4"
+  default     = "16.15"
 }
 
 variable "instance_class" {

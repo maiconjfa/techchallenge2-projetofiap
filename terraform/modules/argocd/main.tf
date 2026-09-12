@@ -22,7 +22,7 @@ data "kustomization_build" "argocd" {
 resource "kustomization_resource" "p0" {
   for_each = try(toset(data.kustomization_build.argocd.ids_prio[0]), [])
 
-  manifest = data.kustomization_build.argocd.manifests
+  manifest = data.kustomization_build.argocd.manifests[each.key]
 }
 
 resource "kustomization_resource" "p1" {
@@ -30,7 +30,7 @@ resource "kustomization_resource" "p1" {
 
   for_each = try(toset(data.kustomization_build.argocd.ids_prio[1]), [])
 
-  manifest = data.kustomization_build.argocd.manifests
+  manifest = data.kustomization_build.argocd.manifests[each.key]
 }
 
 resource "kustomization_resource" "p2" {
@@ -38,5 +38,5 @@ resource "kustomization_resource" "p2" {
 
   for_each = try(toset(data.kustomization_build.argocd.ids_prio[2]), [])
 
-  manifest = data.kustomization_build.argocd.manifests
+  manifest = data.kustomization_build.argocd.manifests[each.key]
 }

@@ -18,17 +18,21 @@ kind: Kustomization
 namespace: argocd
 
 resources:
+  - namespace.yaml
   - install.yaml
 
 # Reducao de recursos do server para ambiente de lab.
+# install.yaml v2.13.3 do argocd-server NAO define resources ->
+# 'replace' falharia (path inexistente); usa-se 'add' no objeto inteiro.
 patches:
   - target:
       kind: Deployment
       name: argocd-server
     patch: |
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/cpu
-        value: 100m
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/limits/cpu
-        value: 500m
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 100m
+          limits:
+            cpu: 500m

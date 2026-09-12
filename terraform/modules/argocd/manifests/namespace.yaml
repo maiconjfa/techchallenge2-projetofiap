@@ -1,0 +1,14 @@
+###############################################################################
+# Namespace do ArgoCD.
+#
+# O install.yaml da release v2.13.3 nao traz um objeto Namespace; sem ele o
+# provider kbst/kustomization nunca cria o namespace e todo recurso p1 falha
+# com 'timed out waiting for ... /Namespace/_/argocd'. Este recurso resolve
+# isso ao garantir que o namespace exista junto aos CRDs (p0).
+###############################################################################
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    app.kubernetes.io/part-of: argocd
