@@ -7,8 +7,8 @@
 #   1. build-test            : compila e roda testes unitarios
 #   2. lint                  : golangci-lint (Go) | flake8 + pylint (Python)
 #   3. security-scan         : SCA (Trivy fs) + SAST (gosec | bandit)
-#                              >>> REGRA DE BLOQUEIO: vulnerabilidade CRITICAL
-#                                  (ou HIGH no SAST) falha o pipeline <<<
+#                              >>> REGRA DE BLOQUEIO: vulnerabilidade CRITICAL/HIGH
+#                                  no SCA (ou HIGH no SAST) falha o pipeline <<<
 #   4. docker-build-scan-push: build da imagem -> Trivy image scan (CRITICAL
 #                              bloqueia) -> login ECR via OIDC -> push
 #   5. update-gitops         : atualiza images.newTag no Kustomize e faz commit
@@ -213,15 +213,15 @@ jobs:
           severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
           format: table
 
-      # Bloqueio: qualquer vulnerabilidade CRITICA nas dependencias/codigo
+      # Bloqueio: qualquer vulnerabilidade CRITICA ou HIGH nas dependencias/codigo
       # tambem captura segredos expostos no fonte.
-      - name: Trivy FS - GATE CRITICAL (bloqueia pipeline)
+      - name: Trivy FS - GATE CRITICAL/HIGH (bloqueia pipeline)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: ${{ inputs.working-directory }}
           scanners: vuln,secret,misconfig
-          severity: CRITICAL
+          severity: CRITICAL,HIGH
           exit-code: "1"
           ignore-unfixed: true
 
