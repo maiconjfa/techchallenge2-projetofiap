@@ -35,3 +35,5 @@ jobs:
       working-directory: analytics-service
       language: python
       ecr-repository: togglemaster-analytics
+    secrets:
+      inherit: true # repassa AWS_ROLE_ARN para o job OIDC

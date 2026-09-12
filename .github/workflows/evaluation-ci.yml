@@ -36,3 +36,5 @@ jobs:
       language: go
       go-version-file: evaluation-service/go.mod
       ecr-repository: togglemaster-evaluation
+    secrets:
+      inherit: true # repassa AWS_ROLE_ARN para o job OIDC
