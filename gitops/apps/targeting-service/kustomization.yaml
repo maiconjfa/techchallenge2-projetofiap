@@ -8,4 +8,4 @@ resources:
   - service.yaml
 images:
   - name: 248530551510.dkr.ecr.us-east-1.amazonaws.com/togglemaster-targeting
-    newTag: v1.0.0-a92a31f
+    newTag: v1.0.0-7ca646c
