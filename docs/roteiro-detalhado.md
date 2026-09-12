@@ -81,7 +81,7 @@ com problema.
 |---|---|---|
 | 1. Build & Test | `go build`/`go test` (ou `pytest`/`compileall`) | não compila / teste falhou |
 | 2. Lint | `golangci-lint` (Go) · `flake8 + pylint` (Python) | erro fatal, código morto |
-| 3. Security Scan | **SCA** `Trivy FS` + **SAST** `gosec` (Go) / `bandit` (Python) | dependência **CRITICAL** · código **HIGH** |
+| 3. Security Scan | **SCA** `Trivy FS` + **SAST** `gosec` (Go) / `bandit` (Python) | dependência **CRITICAL/HIGH** · código **HIGH** |
 | 4. Docker Build & Push | `docker build` + **Trivy Image** + push no **ECR** | imagem com vulnerabilidade **CRITICAL** |
 | 5. Update GitOps | `yq` + commit da tag nova | só roda em push na main |
 
@@ -131,40 +131,59 @@ Dois detalhes que **já quebraram o CI** e viraram resposta de banca:
 
 > **Pré-requisito:** tudo verde (seção 1) e terminal na raiz do repo, branch `main`.
 
-**Cena principal — SCA bloqueando (vermelho → verde):**
+**Cena principal — SCA bloqueando (vermelho → verde, tudo manual):**
+
+> O bloqueio é real: o portão SCA é `GATE CRITICAL/HIGH` e `golang.org/x/crypto v0.20.0` carrega o
+> **CVE-2026-56854 (HIGH)** — o `auth-service` é o único dos 5 sem HIGHs na versão saudável, então
+> o downgrade dele é o que pára o pipeline.
+
+**Passo 0 — preparar** (sincroniza com o CI, que pode ter commitado bump no GitOps):
 
 ```bash
-bash docs/scripts/provocar-sca.sh
+git pull --rebase origin main
 ```
 
-O que ele faz: faz **downgrade** da dependência `golang.org/x/crypto` para **v0.20.0**, que tem o
-**CVE-2026-56854 (CRITICAL)**, comita `demo(sca): ...`, faz push (via SSH) e acompanha o run ao
-vivo.
+**Passo 1 — commit manual do downgrade (o pipeline fica VERMELHO):**
 
-O que esperar: após ~4–6 min o run fica **verde até o estágio 3** e **parado no
-`Security Scan`**:
+```bash
+# Regressa golang.org/x/crypto para v0.20.0 (vulnerável) e regenera o go.sum:
+docker run --rm -v "$PWD":/src -w /src/auth-service golang:1.26-alpine \
+  sh -c "go mod edit -require=golang.org/x/crypto@v0.20.0 && go mod tidy"
+
+git diff --stat                      # confere: só go.mod e go.sum mudaram
+git add auth-service/go.mod auth-service/go.sum
+git commit -m "demo(sca): golang.org/x/crypto v0.20.0 (CVE-2026-56854 HIGH)"
+git push origin main                 # dispara o pipeline do auth-service
+```
+
+O que esperar (após ~4–6 min): run **parado no estágio 3**, passo
+`Trivy FS - GATE CRITICAL/HIGH`:
 
 ```text
-Security Scan -> Trivy FS - GATE CRITICAL (CVE-2026-56854)
-Total: 1 (UNKNOWN: 0, LOW: 0, MEDIUM: 0, HIGH: 0, CRITICAL: 1)
+Security Scan -> Trivy FS - GATE CRITICAL/HIGH (CVE-2026-56854)
+Total: 1 (UNKNOWN: 0, LOW: 0, MEDIUM: 0, HIGH: 1, CRITICAL: 0)
 golang.org/x/crypto (golang)
-╰─ CVE-2026-56854 (CRITICAL) → fix: 0.56.0
+╰─ CVE-2026-56854 (HIGH) → fix: 0.56.0
 ```
 
 > **Para falar:** "O SCA comparou o `go.mod` com o banco de CVEs e achou uma vulnerabilidade
-> **CRITICAL**. Pela regra do portão, o pipeline parou aqui: não gerou imagem, não atualizou o
-> GitOps."
+> **HIGH**. Pela regra do portão **CRITICAL/HIGH**, o pipeline parou aqui: não gerou imagem, não
+> atualizou o GitOps."
 
-Correção (o mesmo pipeline passa):
+**Passo 2 — revert manual (o mesmo pipeline passa):**
 
 ```bash
-bash docs/scripts/reverter-sca.sh
+git pull --rebase origin main        # main pode ter avançado (bot do GitOps)
+
+SHA_DEMO=$(git log origin/main --pretty=%H --grep='demo(sca)' -1)
+git revert --no-edit "$SHA_DEMO"     # desfaz o downgrade (volta a versão saudável)
+git push origin main                 # novo run: verde até o fim (inclui job 5 Update GitOps)
 ```
 
-Faz `git revert` do commit `demo(sca)` e acompanha o run — agora **verde** até o final (inclui o
-job 5 `Update GitOps`).
-
 > **Para falar:** "A correção é um `git revert`. Porta fechada existe, mas a saída é rápida."
+
+> **Dica:** os scripts `docs/scripts/provocar-sca.sh` + `reverter-sca.sh` são o **atalho**
+> automatizado da mesma cena (commit + push + revert); servem de ensaio rápido antes da gravação.
 
 **Cenas opcionais (se o tempo permitir)** — mesma mecânica:
 
@@ -307,7 +326,7 @@ Para falar (3 frases):
 |---|---|
 | O que é Infraestrutura como Código? | Infra descrita em arquivos versionados (Terraform `.tf`); o mesmo código cria, revisa e destrói ambientes — com revisão e rastreabilidade. |
 | Por que backend remoto no S3? | O estado é a "foto" do ambiente. No S3 ele tem **versionamento** (rollback/auditoria), **SSE-S3** e **lock** (`use_lockfile`) — evita perda e `apply` concorrente. |
-| SAST vs SCA? Por que CRITICAL bloqueia? | SCA = vulnerabilidade nas **dependências** (CVE); SAST = bug no **código-fonte**. Bloquear CRITICAL (SCA) / HIGH (SAST) impede vulnerabilidade conhecida de chegar ao cluster. |
+| SAST vs SCA? Por que CRITICAL/HIGH bloqueia? | SCA = vulnerabilidade nas **dependências** (CVE); SAST = bug no **código-fonte**. Bloquear CRITICAL/HIGH (SCA) / HIGH (SAST) impede vulnerabilidade conhecida de chegar ao cluster. |
 | Como o CI acessa a AWS sem chave? | **OIDC**: o GitHub emite um token assinado; a AWS valida emissor/audience e entrega credencial **temporária** da role `togglemaster-github-ci-role`. Zero secret estático. |
 | Por que o job de push do CI falhava / pipeline não iniciava? | Secret usado no caller mas **não declarado** no `workflow_call` → valor vazio ou `startup_failure`. Fix: declarar o secret no reutilizável + repassá-lo explicitamente. |
 | O que é GitOps? | O Git é a **fonte de verdade** do estado desejado; mudanças entram por commit/PR e o agente (**ArgoCD**) converge o cluster. |
@@ -413,6 +432,8 @@ ArgoCD 5× Synced+Healthy · 9/9 pods Running em `feature-flags` · UI ArgoCD vi
 | Run nem iniciou / `startup_failure` ao mexer em secrets | Secret usado no caller mas **não declarado** em `workflow_call.secrets` | Declarar `AWS_ROLE_ARN` no `on.workflow_call.secrets` do `_ci-reusable.yml` + repassar no caller |
 | Run nem iniciou em push normal | Filtro de `paths` não bate (mudou só `docs/**`?) | Esperado. Para forçar: `workflow_dispatch` ou commit real no serviço |
 | Commit vazio não dispara nada | `paths` ignora commits sem arquivos | Usar `workflow_dispatch` ou mudança real (scripts `provocar-*`) |
+| Run **verde** mesmo com o `demo(sca)` aplicado | CVE-2026-56854 é **HIGH** e o gate SCA era só **CRITICAL** (`severity: CRITICAL` no `Trivy FS - GATE`) | Subir o portão para `severity: CRITICAL,HIGH` em `_ci-reusable.yml` (passo `Trivy FS - GATE CRITICAL/HIGH`) |
+| Gate `CRITICAL,HIGH` deixa serviços verdes ficarem vermelhos | Python antigos carregam HIGHs legados (Flask 2.2.2/Werkzeug 2.2.2/gunicorn 20.1.0) e o `evaluation-service` usa `x/net` < 0.56 | Bump para versões corrigidas (`ci(<svc>): remediar CVEs HIGH legados`, `bump golang.org/x/net v0.56.0`) |
 | `main local nao sincronizada` (scripts) | Bot do CI avançou `origin/main` (bump GitOps) | `git pull --rebase origin main` — cuidado em não desfazer demo aberto |
 | `ja existe demo(...) pendente` | Provocação aberta em main | Rode o `reverter-*.sh` correspondente |
 | Push rejeitado nos scripts | HTTPS sem credencial no WSL | Os scripts já usam `git@github.com:...` (SSH) |

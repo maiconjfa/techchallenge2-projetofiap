@@ -106,15 +106,24 @@ Narração: *"1 workflow por serviço; a lógica vive no reutilizável `_ci-reus
 
 ### ✂️ Prova de falha — SCA (2 min)
 
+Portão: `Trivy FS - GATE CRITICAL/HIGH`. Manual, no `auth-service`:
 ```bash
-bash docs/scripts/provocar-sca.sh        # SCA: x/crypto v0.20.0 → CVE-2026-56854 CRITICAL
+docker run --rm -v "$PWD":/src -w /src/auth-service golang:1.26-alpine \
+  sh -c "go mod edit -require=golang.org/x/crypto@v0.20.0 && go mod tidy"
+git add auth-service/go.mod auth-service/go.sum
+git commit -m "demo(sca): golang.org/x/crypto v0.20.0 (CVE-2026-56854 HIGH)"
+git push origin main
 ```
-Filmar: run **VERMELHO** parado em `Security Scan → Trivy FS - GATE CRITICAL`, log citando `CVE-2026-56854`.
-Depois:
+Filmar: run **VERMELHO** parado em `Security Scan → Trivy FS - GATE CRITICAL/HIGH`, log citando `CVE-2026-56854` (`HIGH: 1`).
+Depois, o revert manual:
 ```bash
-bash docs/scripts/reverter-sca.sh        # mostra a CORREÇÃO (revert) e o run verde
+git pull --rebase origin main
+git revert --no-edit "$(git log origin/main --pretty=%H --grep='demo(sca)' -1)"
+git push origin main        # run verde até o fim (inclui Update GitOps)
 ```
-Narração: *"CRITICAL • o pipeline para aqui: não chega no Docker nem no deploy. A correção da dependência volta o verde."*
+Narração: *"HIGH • o pipeline para aqui: não chega no Docker nem no deploy. A correção da dependência (revert) volta o verde."*
+
+> Atalho automatizado (ensaio): `bash docs/scripts/provocar-sca.sh && bash docs/scripts/reverter-sca.sh`
 
 > Opcionais (se sobrar tempo), mesma mecânica:
 > ```bash
@@ -178,7 +187,7 @@ Mapa de entrega FIAP — fechar o vídeo com esta tela:
 | Entregável FIAP | Onde provar |
 |---|---|
 | 1. Terraform com backend remoto | Cena 1 (`versions.tf`, bucket, plan/apply) |
-| 2. CI + DevSecOps (SAST/SCA com bloqueio CRITICAL) | Cena 2 (`_ci-reusable.yml`, run vermelho→verde) |
+| 2. CI + DevSecOps (SAST/SCA com bloqueio CRITICAL/HIGH) | Cena 2 (`_ci-reusable.yml`, run vermelho→verde) |
 | 3. CD/GitOps (tag no repo + ArgoCD sync automático) | Cenas 3–4 (kustomization bumped, UI ArgoCD) |
 
 ---
