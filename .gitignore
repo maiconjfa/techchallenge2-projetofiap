@@ -57,6 +57,9 @@ terraform.tfplan
 planfile
 # Arquivos com valores reais por ambiente NAO devem ser versionados:
 terraform/terraform.tfvars
+# Artefatos gerados pelo roteiro de apresentacao (preparar-apresentacao.sh):
+terraform/plan.out
+terraform/.aws_role_arn.txt
 
 ###############################################################################
 # Kubernetes / GitOps
