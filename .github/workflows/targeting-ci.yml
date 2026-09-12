@@ -36,4 +36,4 @@ jobs:
       language: python
       ecr-repository: togglemaster-targeting
     secrets:
-      inherit: true # repassa AWS_ROLE_ARN para o job OIDC
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
