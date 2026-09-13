@@ -31,7 +31,7 @@ require_main_clean() {
 # Garante que nenhuma outra provocacao esteja pendente em main.
 require_no_open_demo() {
   local m
-  for m in "demo(sca)" "demo(sast)" "demo(lint)"; do
+  for m in "demo(sca)" "demo(sast)" "demo(lint)" "demo(gitops)"; do
     if git -C "$ROOT" log origin/main --oneline --grep="$m" | grep -q .; then
       die "ja existe \"$m\" pendente em main; rode o reverter-*.sh correspondente antes de provocar de novo"
     fi

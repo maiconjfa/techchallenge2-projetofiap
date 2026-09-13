@@ -250,8 +250,18 @@ kubectl get pods -n feature-flags
 
 ### 3.4 O clímax: disparar o ciclo completo e ver o sync acontecer
 
-O gatilho pode ser **qualquer push real na main** — o mais didático é reusar uma cena da Etapa 1
-(ex.: `bash docs/scripts/provocar-lint.sh`). Com o pipeline correndo:
+O gatilho precisa ser um push que produza run **VERDE** — só um run verde chega ao job
+`update-gitops` e comita o bump da tag (um `provocar-lint`, vermelho de propósito, **não** gera
+bump). Usar o gatilho benigno dedicado (mudança segura no log do auth-service):
+
+```bash
+bash docs/scripts/provocar-gitops.sh
+```
+
+> O passo a passo completo, com comandos e falas para os **2 passos obrigatórios** (GitOps:
+> tag no repositório | ArgoCD: sync automático), está em `docs/gitops-argocd-demo.md`.
+
+Com o pipeline correndo:
 
 ```bash
 # Janela 1: acompanhando o deploy convergir

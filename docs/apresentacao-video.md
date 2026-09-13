@@ -159,9 +159,11 @@ kubectl port-forward svc/argocd-server -n argocd 8080:443   # browser: https://l
 **★ Clímax — sync automático:** com a UI e o terminal do ArgoCD visíveis:
 
 ```bash
-bash docs/scripts/provocar-lint.sh   # dispara novo commit (ou use reverter-sca.sh já pendurado...)
+bash docs/scripts/provocar-gitops.sh   # gatilho VERDE: mudança benigna no log do auth
 ```
-> Na prática, qualquer push gera bump no GitOps → ArgoCD detecta **OutOfSync** → synchronized.
+> Na prática, qualquer push **verde** gera bump no GitOps → ArgoCD detecta **OutOfSync**
+> → synchronized. (Um `provocar-*` vermelho de propósito **não** gera bump.)
+> Passo a passo com os 2 itens obrigatórios do projeto e as falas: `docs/gitops-argocd-demo.md`.
 Fechar com:
 ```bash
 kubectl rollout status deployment/auth-service -n feature-flags --timeout=180s
