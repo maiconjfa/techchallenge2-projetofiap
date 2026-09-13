@@ -8,4 +8,4 @@ resources:
   - service.yaml
 images:
   - name: 248530551510.dkr.ecr.us-east-1.amazonaws.com/togglemaster-auth
-    newTag: v1.0.0-dbd03a5
+    newTag: v1.0.0-4c41011
