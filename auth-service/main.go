@@ -1,3 +1,4 @@
+// demo(gitops): mudanca benigna - dispara CI/CD dos 5 servicos.
 package main
 
 import (
