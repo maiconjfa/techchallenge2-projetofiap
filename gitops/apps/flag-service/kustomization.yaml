@@ -8,4 +8,4 @@ resources:
   - service.yaml
 images:
   - name: 248530551510.dkr.ecr.us-east-1.amazonaws.com/togglemaster-flag
-    newTag: v1.0.0-7ca646c
+    newTag: v1.0.0-4bac41c
