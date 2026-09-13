@@ -81,5 +81,3 @@ func connectDB(databaseURL string) (*sql.DB, error) {
 	log.Println("Conectado ao PostgreSQL com sucesso!")
 	return db, nil
 }
-// demo(lint): variavel de pacote nao utilizada - o golangci-lint (unused) bloqueia.
-var demoUnused = "ci-linter-demo-marker"
