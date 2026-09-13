@@ -61,7 +61,7 @@ func main() {
 	// Eles são protegidos pelo middleware de autenticação
 	mux.Handle("/admin/keys", app.masterKeyAuthMiddleware(http.HandlerFunc(app.createKeyHandler)))
 
-	log.Printf("Serviço de Autenticação (Go) versão %s rodando na porta %s", appVersion, port)
+	log.Printf("Serviço de Autenticação (Go) rodando na porta %s", port)
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Fatal(err)
 	}
@@ -81,5 +81,3 @@ func connectDB(databaseURL string) (*sql.DB, error) {
 	log.Println("Conectado ao PostgreSQL com sucesso!")
 	return db, nil
 }
-// demo(gitops): versao do app exibida no log - mudanca benigna que dispara a CD.
-const appVersion = "1.0.0-demo"
