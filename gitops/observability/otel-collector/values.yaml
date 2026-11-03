@@ -1,8 +1,10 @@
 mode: deployment
+replicaCount: 1
 
 image:
   repository: otel/opentelemetry-collector-contrib
   tag: "0.112.0"
+  pullPolicy: IfNotPresent
 
 config:
   receivers:
@@ -45,6 +47,10 @@ config:
       traces:
         trace_buffer: 100
 
+  extensions:
+    health_check:
+      endpoint: 0.0.0.0:13133
+
   service:
     extensions: [health_check]
     pipelines:
@@ -60,10 +66,6 @@ config:
         receivers: [otlp]
         processors: [memory_limiter, batch, resource]
         exporters: [loki]
-
-extensions:
-  health_check:
-    endpoint: 0.0.0.0:13133
 
 ports:
   otlp:
@@ -89,11 +91,3 @@ ports:
 
 serviceMonitor:
   enabled: true
-
-image:
-  repository: otel/opentelemetry-collector-contrib
-  tag: 0.112.0
-  pullPolicy: IfNotPresent
-
-mode: deployment
-replicaCount: 1
