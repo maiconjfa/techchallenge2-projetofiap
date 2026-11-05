@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha1"
 	"encoding/binary"
 	"encoding/json"
@@ -20,23 +21,20 @@ const (
 )
 
 // getDecision é o wrapper principal
-func (a *App) getDecision(userID, flagName string) (bool, error) {
-	// 1. Obter os dados da flag (do cache ou dos serviços)
-	info, err := a.getCombinedFlagInfo(flagName)
-	if err != nil {
-		return false, err
-	}
+func (a *App) getDecision(userID, flagName string) (bool, error) { return a.getDecisionWithContext(context.Background(), userID, flagName) }
 
-	// 2. Executar a lógica de avaliação
+func (a *App) getDecisionWithContext(reqCtx context.Context, userID, flagName string) (bool, error) {
+	info, err := a.getCombinedFlagInfo(reqCtx, flagName)
+	if err != nil { return false, err }
 	return a.runEvaluationLogic(info, userID), nil
 }
 
 // getCombinedFlagInfo busca os dados no Redis, com fallback para os microsserviços
-func (a *App) getCombinedFlagInfo(flagName string) (*CombinedFlagInfo, error) {
+func (a *App) getCombinedFlagInfo(reqCtx context.Context, flagName string) (*CombinedFlagInfo, error) {
 	cacheKey := fmt.Sprintf("flag_info:%s", flagName)
 
 	// 1. Tentar buscar do Cache (Redis)
-	val, err := a.RedisClient.Get(ctx, cacheKey).Result()
+	val, err := a.RedisClient.Get(reqCtx, cacheKey).Result()
 	if err == nil {
 		// Cache HIT
 		var info CombinedFlagInfo
@@ -50,7 +48,7 @@ func (a *App) getCombinedFlagInfo(flagName string) (*CombinedFlagInfo, error) {
 	
 	log.Printf("Cache MISS para flag '%s'", flagName)
 	// 2. Cache MISS - Buscar dos serviços
-	info, err := a.fetchFromServices(flagName)
+	info, err := a.fetchFromServices(reqCtx, flagName)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +56,7 @@ func (a *App) getCombinedFlagInfo(flagName string) (*CombinedFlagInfo, error) {
 	// 3. Salvar no Cache
 	jsonData, err := json.Marshal(info)
 	if err == nil {
-		if err := a.RedisClient.Set(ctx, cacheKey, jsonData, CACHE_TTL).Err(); err != nil {
+		if err := a.RedisClient.Set(reqCtx, cacheKey, jsonData, CACHE_TTL).Err(); err != nil {
 			log.Printf("Erro ao salvar flag '%s' no cache: %v", flagName, err)
 		}
 	}
@@ -67,7 +65,7 @@ func (a *App) getCombinedFlagInfo(flagName string) (*CombinedFlagInfo, error) {
 }
 
 // fetchFromServices busca dados do flag-service e targeting-service concorrentemente
-func (a *App) fetchFromServices(flagName string) (*CombinedFlagInfo, error) {
+func (a *App) fetchFromServices(reqCtx context.Context, flagName string) (*CombinedFlagInfo, error) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
@@ -78,13 +76,13 @@ func (a *App) fetchFromServices(flagName string) (*CombinedFlagInfo, error) {
 	// Goroutine 1: Buscar do flag-service
 	go func() {
 		defer wg.Done()
-		flagInfo, flagErr = a.fetchFlag(flagName)
+		flagInfo, flagErr = a.fetchFlag(reqCtx, flagName)
 	}()
 
 	// Goroutine 2: Buscar do targeting-service
 	go func() {
 		defer wg.Done()
-		ruleInfo, ruleErr = a.fetchRule(flagName)
+		ruleInfo, ruleErr = a.fetchRule(reqCtx, flagName)
 	}()
 
 	wg.Wait()
@@ -115,7 +113,7 @@ func sanitizeFlagName(name string) (string, error) {
 var flagNameRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$`)
 
 // fetchFlag (função helper)
-func (a *App) fetchFlag(flagName string) (*Flag, error) {
+func (a *App) fetchFlag(reqCtx context.Context, flagName string) (*Flag, error) {
 	name, err := sanitizeFlagName(flagName)
 	if err != nil {
 		return nil, err
@@ -123,9 +121,9 @@ func (a *App) fetchFlag(flagName string) (*Flag, error) {
 	url := fmt.Sprintf("%s/flags/%s", a.FlagServiceURL, name)
 
 	apiKey := os.Getenv("SERVICE_API_KEY")
-	req, _ := http.NewRequest("GET", url, nil) // #nosec G704 -- SSRF mitigado: flagName validado por sanitizeFlagName e host de origem e fixo (flag/targeting-service)
+	req, _ := http.NewRequestWithContext(reqCtx, "GET", url, nil) // #nosec G704 -- SSRF mitigado: flagName validado por sanitizeFlagName e host de origem e fixo (flag/targeting-service)
 	req.Header.Set("Authorization", "Bearer "+apiKey)
-	
+
 	resp, err := a.HttpClient.Do(req) // #nosec G704 -- SSRF mitigado: flagName validado por sanitizeFlagName e host de origem e fixo (flag/targeting-service)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao chamar flag-service: %w", err)
@@ -149,16 +147,16 @@ func (a *App) fetchFlag(flagName string) (*Flag, error) {
 	return &flag, nil
 }
 
-func (a *App) fetchRule(flagName string) (*TargetingRule, error) {
+func (a *App) fetchRule(reqCtx context.Context, flagName string) (*TargetingRule, error) {
 	name, err := sanitizeFlagName(flagName)
 	if err != nil {
 		return nil, err
 	}
 	url := fmt.Sprintf("%s/rules/%s", a.TargetingServiceURL, name)
 	apiKey := os.Getenv("SERVICE_API_KEY") // Usa a mesma chave
-	req, _ := http.NewRequest("GET", url, nil) // #nosec G704 -- SSRF mitigado: flagName validado por sanitizeFlagName e host de origem e fixo (flag/targeting-service)
+	req, _ := http.NewRequestWithContext(reqCtx, "GET", url, nil) // #nosec G704 -- SSRF mitigado: flagName validado por sanitizeFlagName e host de origem e fixo (flag/targeting-service)
 	req.Header.Set("Authorization", "Bearer "+apiKey)
-	
+
 	resp, err := a.HttpClient.Do(req) // #nosec G704 -- SSRF mitigado: flagName validado por sanitizeFlagName e host de origem e fixo (flag/targeting-service)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao chamar targeting-service: %w", err)

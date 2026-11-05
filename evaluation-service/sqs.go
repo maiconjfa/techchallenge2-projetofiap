@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"time"
@@ -18,14 +19,14 @@ type Event struct {
 	Timestamp string `json:"timestamp"`
 }
 
-func (a *App) sendEvaluationEvent(userID, flagName string, result bool) {
+func (a *App) sendEvaluationEvent(parentCtx context.Context, userID, flagName string, result bool) {
 	if a.SqsSvc == nil || a.SqsQueueURL == "" {
 		return
 	}
 
-	ctx := otel.GetTextMapPropagator().Extract(ctx, propagation.HeaderCarrier{})
+	msgCtx := otel.GetTextMapPropagator().Extract(parentCtx, propagation.HeaderCarrier{})
 	tracer := otel.Tracer("evaluation-service")
-	_, span := tracer.Start(ctx, "sqs.send.evaluation_event")
+	_, span := tracer.Start(msgCtx, "sqs.send.evaluation_event")
 	defer span.End()
 
 	body, err := json.Marshal(Event{
@@ -40,7 +41,7 @@ func (a *App) sendEvaluationEvent(userID, flagName string, result bool) {
 	}
 
 	carrier := propagation.MapCarrier{}
-	otel.GetTextMapPropagator().Inject(ctx, carrier)
+	otel.GetTextMapPropagator().Inject(msgCtx, carrier)
 
 	attrs := map[string]*sqs.MessageAttributeValue{
 		"traceparent": {DataType: aws.String("String"), StringValue: aws.String(carrier["traceparent"])},

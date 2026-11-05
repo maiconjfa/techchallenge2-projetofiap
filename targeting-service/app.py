@@ -56,3 +56,20 @@ def require_auth(f):
 @app.route('/health')
 def health():
     return jsonify({'status': 'ok'})
+
+
+@app.route('/rules/<flag_name>', methods=['GET'])
+@require_auth
+def get_rule(flag_name):
+    conn = cur = None
+    try:
+        conn = pool.getconn(); cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute('SELECT * FROM targeting_rules WHERE flag_name = %s', (flag_name,))
+        row = cur.fetchone()
+        if not row: return jsonify({'error':'not found'}), 404
+        return jsonify(row), 200
+    except Exception as e:
+        log.error(f'get_rule: {e}'); return jsonify({'error':'internal'}), 500
+    finally:
+        if cur: cur.close()
+        if conn: pool.putconn(conn)

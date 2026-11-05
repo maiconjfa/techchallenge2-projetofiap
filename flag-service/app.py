@@ -87,3 +87,20 @@ def create_flag():
     finally:
         if cur: cur.close()
         if conn: pool.putconn(conn)
+
+
+@app.route('/flags/<flag_name>', methods=['GET'])
+@require_auth
+def get_flag(flag_name):
+    conn = cur = None
+    try:
+        conn = pool.getconn(); cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute('SELECT * FROM flags WHERE name = %s', (flag_name,))
+        row = cur.fetchone()
+        if not row: return jsonify({'error':'not found'}), 404
+        return jsonify(row), 200
+    except Exception as e:
+        log.error(f'get_flag: {e}'); return jsonify({'error':'internal'}), 500
+    finally:
+        if cur: cur.close()
+        if conn: pool.putconn(conn)
