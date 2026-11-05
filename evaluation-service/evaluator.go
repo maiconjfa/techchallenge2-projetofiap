@@ -20,9 +20,6 @@ const (
 	CACHE_TTL = 30 * time.Second
 )
 
-// getDecision é o wrapper principal
-func (a *App) getDecision(userID, flagName string) (bool, error) { return a.getDecisionWithContext(context.Background(), userID, flagName) }
-
 func (a *App) getDecisionWithContext(reqCtx context.Context, userID, flagName string) (bool, error) {
 	info, err := a.getCombinedFlagInfo(reqCtx, flagName)
 	if err != nil { return false, err }
