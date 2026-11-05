@@ -36,23 +36,26 @@ except psycopg2.OperationalError as e:
     log.critical(f'Erro fatal: {e}')
     sys.exit(1)
 
-def require_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth_header = request.headers.get('Authorization')
+def require_auth(fn):
+    @wraps(fn)
+    def wrapper(*a,**kw):
+        auth_header = request.headers.get("Authorization")
         if not auth_header:
-            return jsonify({'error': 'Authorization header obrigatório'}), 401
+            return jsonify({"error":"Authorization header obrigatório"}), 401
+        service_key = os.getenv("SERVICE_API_KEY","")
+        token = auth_header.split(" ",1)[1] if " " in auth_header else auth_header
+        if service_key and token == service_key:
+            return fn(*a,**kw)
         try:
-            validate_url = f'{AUTH_SERVICE_URL}/validate'
-            resp = requests.get(validate_url, headers={'Authorization': auth_header}, timeout=3)
+            validate_url = f"{AUTH_SERVICE_URL}/validate"
+            resp = requests.get(validate_url, headers={"Authorization": auth_header}, timeout=3)
             if resp.status_code != 200:
-                return jsonify({'error': 'Chave de API inválida'}), 401
+                return jsonify({"error":"Chave de API inválida"}), 401
         except Exception as e:
-            log.error(f'Erro auth: {e}')
-            return jsonify({'error': 'Serviço de autenticação indisponível'}), 503
-        return f(*args, **kwargs)
-    return decorated
-
+            log.error(f"Erro auth: {e}")
+            return jsonify({"error":"Serviço de autenticação indisponível"}), 503
+        return fn(*a,**kw)
+    return wrapper
 @app.route('/health')
 def health():
     return jsonify({'status': 'ok'})

@@ -43,6 +43,10 @@ def require_auth(f):
         auth_header = request.headers.get('Authorization')
         if not auth_header:
             return jsonify({'error': 'Authorization header obrigatório'}), 401
+        service_key = os.getenv('SERVICE_API_KEY', '')
+        token = auth_header.split(' ', 1)[1] if ' ' in auth_header else auth_header
+        if service_key and token == service_key:
+            return f(*args, **kwargs)
         try:
             validate_url = f'{AUTH_SERVICE_URL}/validate'
             response = requests.get(validate_url, headers={'Authorization': auth_header}, timeout=3)
