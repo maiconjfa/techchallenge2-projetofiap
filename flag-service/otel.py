@@ -10,6 +10,9 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.composite import CompositePropagator
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
+from opentelemetry.instrumentation.psycopg2 import Psycopg2Instrumentor
 
 def init_otel():
     endpoint = os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT', 'http://otel-collector-opentelemetry-collector.observability.svc.cluster.local:4318')
@@ -34,3 +37,12 @@ def init_otel():
     metrics.set_meter_provider(mp)
     set_global_textmap(CompositePropagator([TraceContextTextMapPropagator()]))
     return tp, mp
+
+
+def instrument_app(app):
+    try: Psycopg2Instrumentor().instrument()
+    except Exception: pass
+    try: RequestsInstrumentor().instrument()
+    except Exception: pass
+    try: FlaskInstrumentor().instrument_app(app)
+    except Exception: pass

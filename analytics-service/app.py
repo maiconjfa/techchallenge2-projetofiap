@@ -13,7 +13,7 @@ from botocore.exceptions import NoCredentialsError, ClientError
 from flask import Flask, jsonify
 from dotenv import load_dotenv
 
-from otel import init_otel
+from otel import init_otel, instrument_worker
 from opentelemetry import trace, propagate
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
@@ -23,6 +23,7 @@ log = logging.getLogger(__name__)
 load_dotenv()
 
 tp, mp = init_otel()
+instrument_worker()
 tracer = trace.get_tracer('analytics-service')
 
 AWS_REGION = os.getenv('AWS_REGION')

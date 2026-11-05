@@ -11,6 +11,10 @@ from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
 from opentelemetry.propagators.composite import CompositePropagator
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+try:
+    from opentelemetry.instrumentation.botocore import BotocoreInstrumentor
+except Exception:
+    BotocoreInstrumentor=None
 
 def init_otel():
     endpoint = os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT', 'http://otel-collector-opentelemetry-collector.observability.svc.cluster.local:4318')
@@ -35,3 +39,9 @@ def init_otel():
     metrics.set_meter_provider(mp)
     set_global_textmap(CompositePropagator([TraceContextTextMapPropagator(), B3MultiFormat()]))
     return tp, mp
+
+
+def instrument_worker():
+    try:
+        if BotocoreInstrumentor: BotocoreInstrumentor().instrument()
+    except Exception: pass

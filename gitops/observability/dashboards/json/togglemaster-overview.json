@@ -1,5 +1,5 @@
 {
-  "annotations": {"list": [{"builtIn": 1, "datasource": {"type": "grafana", "uid": "-- Grafana --"}, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard"}]},
+  "annotations": {"list": []},
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -8,60 +8,80 @@
   "panels": [
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisBorderShow": false, "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "showPoints": "never"}, "unit": "short"}, "overrides": []},
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never"}}, "overrides": []},
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
       "id": 1,
-      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"feature-flags\",container!=\"\",image!=\"\"}[5m])) by (pod)", "legendFormat": "{{pod}}", "range": true, "refId": "A"}],
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"feature-flags\",container!=\"\",image!=\"\"}[5m])) by (pod)", "legendFormat": "{{pod}}", "refId": "A"}],
       "title": "CPU por Pod (feature-flags)",
       "type": "timeseries"
     },
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisBorderShow": false, "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "showPoints": "never"}, "unit": "bytes"}, "overrides": []},
+      "fieldConfig": {"defaults": {"unit": "bytes", "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never"}}, "overrides": []},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
       "id": 2,
-      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "sum(container_memory_working_set_bytes{namespace=\"feature-flags\",container!=\"\",image!=\"\"}) by (pod)", "legendFormat": "{{pod}}", "range": true, "refId": "A"}],
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum(container_memory_working_set_bytes{namespace=\"feature-flags\",container!=\"\",image!=\"\"}) by (pod)", "legendFormat": "{{pod}}", "refId": "A"}],
       "title": "Memória por Pod (feature-flags)",
       "type": "timeseries"
     },
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never"}, "unit": "Bps"}, "overrides": []},
+      "fieldConfig": {"defaults": {"unit": "reqps", "min": 0, "custom": {"drawStyle": "line", "fillOpacity": 12, "lineWidth": 2, "showPoints": "never"}}, "overrides": []},
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 6,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum(rate(traces_spanmetrics_calls_total{service_namespace=\"feature-flags\",span_kind=~\"SPAN_KIND_SERVER|server\"}[5m])) by (service_name) or sum(rate(traces_spanmetrics_calls_total{service_namespace=\"feature-flags\"}[5m])) by (service_name) or sum(rate(otel_traces_spanmetrics_calls_total{service_namespace=\"feature-flags\"}[5m])) by (service_name) or vector(0)", "legendFormat": "{{service_name}}", "refId": "A"}],
+      "title": "Taxa de requisições por serviço (traces/spanmetrics)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "reqps", "min": 0, "custom": {"drawStyle": "line", "fillOpacity": 12, "lineWidth": 2, "showPoints": "never"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.1}]}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "id": 7,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum(rate(traces_spanmetrics_calls_total{service_namespace=\"feature-flags\",http_status_code=~\"5..\"}[5m])) by (service_name) or sum(rate(traces_spanmetrics_calls_total{service_namespace=\"feature-flags\",status_code=\"STATUS_CODE_ERROR\"}[5m])) by (service_name) or sum(rate(otel_traces_spanmetrics_calls_total{service_namespace=\"feature-flags\",status_code=\"STATUS_CODE_ERROR\"}[5m])) by (service_name) or vector(0)", "legendFormat": "{{service_name}}", "refId": "A"}],
+      "title": "Taxa de erro 5xx por serviço (traces/spanmetrics)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "Bps", "custom": {"drawStyle": "line", "fillOpacity": 8, "lineWidth": 1, "showPoints": "never"}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
       "id": 3,
-      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["lastNotNull"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "targets": [
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "sum(rate(container_network_receive_bytes_total{namespace=\"feature-flags\",pod!=\"\"}[5m])) by (pod)", "legendFormat": "rx {{pod}}", "range": true, "refId": "A"},
-        {"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "sum(rate(container_network_transmit_bytes_total{namespace=\"feature-flags\",pod!=\"\"}[5m])) by (pod)", "legendFormat": "tx {{pod}}", "range": true, "refId": "B"}
+        {"expr": "sum(rate(container_network_receive_bytes_total{namespace=\"feature-flags\",pod!=\"\"}[5m])) by (pod)", "legendFormat": "rx {{pod}}", "refId": "A"},
+        {"expr": "-sum(rate(container_network_transmit_bytes_total{namespace=\"feature-flags\",pod!=\"\"}[5m])) by (pod)", "legendFormat": "tx {{pod}}", "refId": "B"}
       ],
       "title": "Rede por Pod (feature-flags)",
       "type": "timeseries"
     },
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}]}, "unit": "short"}, "overrides": []},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"drawStyle": "line", "fillOpacity": 0, "lineWidth": 2, "showPoints": "auto"}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
       "id": 4,
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "sum(kube_pod_container_status_restarts_total{namespace=\"feature-flags\"}) by (pod)", "legendFormat": "{{pod}}", "range": true, "refId": "A"}],
-      "title": "Restarts de Containers (feature-flags)",
-      "type": "stat"
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["lastNotNull", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"feature-flags\"}[30m])) by (pod,container) > 0 or vector(0)", "legendFormat": "{{pod}}/{{container}}", "refId": "A"}],
+      "title": "Restarts de Containers (30m, feature-flags)",
+      "type": "timeseries"
     },
     {
       "datasource": {"type": "loki", "uid": "loki"},
-      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 16},
+      "gridPos": {"h": 11, "w": 24, "x": 0, "y": 24},
       "id": 5,
       "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showCommonLabels": false, "showLabels": true, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
-      "targets": [{"datasource": {"type": "loki", "uid": "loki"}, "editorMode": "code", "expr": "{namespace=\"feature-flags\"}", "queryType": "range", "refId": "A"}],
+      "targets": [{"expr": "{namespace=\"feature-flags\"} | line_format \"{{.pod}} {{__line__}}\"", "refId": "A", "datasource": {"type": "loki", "uid": "loki"}}],
       "title": "Logs (feature-flags)",
       "type": "logs"
     }
   ],
-  "refresh": "10s",
+  "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["togglemaster", "observability"],
+  "tags": ["togglemaster", "feature-flags", "observability"],
   "templating": {"list": []},
   "time": {"from": "now-30m", "to": "now"},
   "timepicker": {},

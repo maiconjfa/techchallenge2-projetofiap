@@ -15,6 +15,23 @@ config:
         http:
           endpoint: 0.0.0.0:4318
 
+  connectors:
+    spanmetrics:
+      histogram:
+        explicit:
+          buckets: [5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s]
+      dimensions:
+        - name: http.method
+        - name: http.status_code
+        - name: http.route
+        - name: service.name
+      exemplars:
+        enabled: true
+      dimensions_cache_size: 1000
+      aggregation_temporality: "AGGREGATION_TEMPORALITY_CUMULATIVE"
+      metrics_flush_interval: 15s
+      namespace: traces.spanmetrics
+
   processors:
     memory_limiter:
       check_interval: 1s
@@ -34,7 +51,8 @@ config:
   exporters:
     prometheus:
       endpoint: "0.0.0.0:8889"
-      namespace: otel
+      resource_to_telemetry_conversion:
+        enabled: true
     loki:
       endpoint: "http://loki-gateway.observability.svc.cluster.local/loki/api/v1/push"
       default_labels_enabled:
@@ -57,9 +75,9 @@ config:
       traces:
         receivers: [otlp]
         processors: [memory_limiter, batch, resource]
-        exporters: [datadog]
+        exporters: [datadog, spanmetrics]
       metrics:
-        receivers: [otlp]
+        receivers: [otlp, spanmetrics]
         processors: [memory_limiter, batch, resource]
         exporters: [prometheus]
       logs:

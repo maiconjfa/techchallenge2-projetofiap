@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from functools import wraps
 import logging
 
-from otel import init_otel
+from otel import init_otel, instrument_app
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -20,6 +20,8 @@ load_dotenv()
 init_otel()
 
 app = Flask(__name__)
+app.logger.setLevel(logging.INFO)
+instrument_app(app)
 
 DATABASE_URL = os.getenv('DATABASE_URL')
 AUTH_SERVICE_URL = os.getenv('AUTH_SERVICE_URL')
