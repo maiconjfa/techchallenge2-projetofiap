@@ -8,61 +8,75 @@ metadata:
 data:
   togglemaster-overview.json: |
     {
+      "annotations": {"list": [{"builtIn": 1, "datasource": {"type": "grafana", "uid": "-- Grafana --"}, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard"}]},
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
       "id": null,
-      "uid": "togglemaster-overview",
-      "title": "ToggleMaster - Overview",
-      "tags": ["togglemaster", "observability"],
-      "timezone": "browser",
-      "schemaVersion": 39,
-      "version": 1,
-      "refresh": "5s",
+      "links": [],
       "panels": [
         {
-          "datasource": "Prometheus",
-          "fieldConfig": { "defaults": { "unit": "percent" } },
-          "gridPos": { "h": 6, "w": 12, "x": 0, "y": 0 },
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisBorderShow": false, "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "showPoints": "never"}, "unit": "short"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
           "id": 1,
-          "title": "Cluster CPU Usage",
+          "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+          "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"feature-flags\",container!=\"\",image!=\"\"}[5m])) by (pod)", "legendFormat": "{{pod}}", "range": true, "refId": "A"}],
+          "title": "CPU por Pod (feature-flags)",
           "type": "timeseries"
         },
         {
-          "datasource": "Prometheus",
-          "fieldConfig": { "defaults": { "unit": "percent" } },
-          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 0 },
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisBorderShow": false, "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "showPoints": "never"}, "unit": "bytes"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
           "id": 2,
-          "title": "Cluster Memory Usage",
+          "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+          "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "sum(container_memory_working_set_bytes{namespace=\"feature-flags\",container!=\"\",image!=\"\"}) by (pod)", "legendFormat": "{{pod}}", "range": true, "refId": "A"}],
+          "title": "Memória por Pod (feature-flags)",
           "type": "timeseries"
         },
         {
-          "datasource": "Prometheus",
-          "gridPos": { "h": 6, "w": 24, "x": 0, "y": 6 },
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never"}, "unit": "Bps"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
           "id": 3,
-          "title": "HTTP Requests RPS by Service",
+          "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
           "targets": [
-            { "expr": "sum(rate(http_server_requests_total[1m])) by (job)", "legendFormat": "{{job}}" }
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "sum(rate(container_network_receive_bytes_total{namespace=\"feature-flags\",pod!=\"\"}[5m])) by (pod)", "legendFormat": "rx {{pod}}", "range": true, "refId": "A"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "sum(rate(container_network_transmit_bytes_total{namespace=\"feature-flags\",pod!=\"\"}[5m])) by (pod)", "legendFormat": "tx {{pod}}", "range": true, "refId": "B"}
           ],
+          "title": "Rede por Pod (feature-flags)",
           "type": "timeseries"
         },
         {
-          "datasource": "Prometheus",
-          "gridPos": { "h": 6, "w": 24, "x": 0, "y": 12 },
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}]}, "unit": "short"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
           "id": 4,
-          "title": "HTTP 5xx Errors by Service",
-          "targets": [
-            { "expr": "sum(rate(http_server_requests_total{status=~\"5..\"}[5m])) by (job)", "legendFormat": "{{job}}" }
-          ],
-          "type": "timeseries"
+          "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+          "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "sum(kube_pod_container_status_restarts_total{namespace=\"feature-flags\"}) by (pod)", "legendFormat": "{{pod}}", "range": true, "refId": "A"}],
+          "title": "Restarts de Containers (feature-flags)",
+          "type": "stat"
         },
         {
-          "datasource": "Loki",
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 18 },
+          "datasource": {"type": "loki", "uid": "loki"},
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 16},
           "id": 5,
-          "options": { "showLabels": true, "showTime": true, "wrapLogMessage": true },
-          "targets": [
-            { "expr": "{namespace=\"feature-flags\"} |~ \".*\"", "refId": "A" }
-          ],
-          "title": "Logs (feature-flags) - Tempo Real",
+          "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showCommonLabels": false, "showLabels": true, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
+          "targets": [{"datasource": {"type": "loki", "uid": "loki"}, "editorMode": "code", "expr": "{namespace=\"feature-flags\"}", "queryType": "range", "refId": "A"}],
+          "title": "Logs (feature-flags)",
           "type": "logs"
         }
-      ]
+      ],
+      "refresh": "10s",
+      "schemaVersion": 39,
+      "tags": ["togglemaster", "observability"],
+      "templating": {"list": []},
+      "time": {"from": "now-30m", "to": "now"},
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "ToggleMaster - Overview",
+      "uid": "togglemaster-overview",
+      "version": 2,
+      "weekStart": ""
     }
