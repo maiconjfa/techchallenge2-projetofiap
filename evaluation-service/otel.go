@@ -11,7 +11,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -42,6 +42,7 @@ func initTracer() func(context.Context) error {
 			semconv.ServiceNameKey.String("evaluation-service"),
 			semconv.ServiceNamespaceKey.String("feature-flags"),
 			semconv.DeploymentEnvironmentKey.String("demo"),
+			semconv.ServiceVersionKey.String("1.0.0"),
 		),
 	)
 	if err != nil {
