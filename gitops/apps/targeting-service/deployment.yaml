@@ -50,6 +50,11 @@ spec:
                   key: AUTH_SERVICE_URL
             - name: PGSSLMODE
               value: disable
+            - name: SERVICE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: SERVICE_API_KEY
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: http://otel-collector-opentelemetry-collector.observability.svc.cluster.local:4318
             - name: OTEL_EXPORTER_OTLP_PROTOCOL

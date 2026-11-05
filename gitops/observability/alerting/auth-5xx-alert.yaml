@@ -12,14 +12,18 @@ spec:
     - alert: AuthServiceHigh5xxRate
       expr: |
         (
-          sum(rate(http_requests_total{job="auth-service",code=~"5.."}[2m]))
-          /
-          sum(rate(http_requests_total{job="auth-service"}[2m]))
+          sum(rate(otel_traces_spanmetrics_calls_total{service_name="auth-service",span_kind="SPAN_KIND_SERVER",http_status_code=~"5.."}[5m]))
+          or vector(0)
+        )
+        /
+        clamp_min(
+          sum(rate(otel_traces_spanmetrics_calls_total{service_name="auth-service",span_kind="SPAN_KIND_SERVER"}[5m])),
+          0.001
         ) * 100 > 5
-      for: 1m
+      for: 2m
       labels:
         severity: critical
         service: auth-service
       annotations:
         summary: "Alta taxa de erros 5xx no auth-service"
-        description: "Taxa de 5xx > 5% nos últimos 2 minutos no auth-service."
+        description: "Taxa de 5xx > 5% (janela 5m) no auth-service via spanmetrics OTel."
