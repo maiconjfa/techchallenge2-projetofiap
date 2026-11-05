@@ -26,6 +26,15 @@ resource "aws_eks_cluster" "this" {
   tags = merge(var.tags, {
     Name = var.cluster_name
   })
+
+  lifecycle {
+    ignore_changes = [
+      bootstrap_self_managed_addons,
+      access_config,
+      kubernetes_network_config,
+      enabled_cluster_log_types,
+    ]
+  }
 }
 
 ###############################################################################
@@ -38,8 +47,8 @@ resource "aws_eks_node_group" "this" {
   node_role_arn   = local.node_role_arn
 
   subnet_ids     = var.subnet_ids
-  capacity_type  = "ON_DEMAND"
-  instance_types = [var.instance_type]
+  capacity_type  = "SPOT"
+  instance_types = ["t3.medium", "t3a.medium", "t3.large", "t3.small"]
   disk_size      = var.disk_size
 
   scaling_config {

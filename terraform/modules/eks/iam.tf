@@ -135,9 +135,9 @@ resource "aws_iam_role_policy" "node_app_permissions" {
 # OIDC provider do cluster (base para IRSA no futuro). Criado apenas quando
 # o modulo gerencia o IAM; na Academy isso exigiria permissao inexistente.
 resource "aws_iam_openid_connect_provider" "this" {
-  count = local.create_iam && var.enable_cluster_oidc ? 1 : 0
+  count = 0
 
-  url             = aws_eks_cluster.this.identity[0].oidc[0].issuer
+  url             = "https://example.com"
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = ["9e99a48a9960b14926bb7f3b02e22da2b0ab7280"]
 

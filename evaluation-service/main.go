@@ -1,4 +1,4 @@
-// demo(gitops): mudanca benigna - dispara CI/CD dos 5 servicos.
+// demo(gitops): OTel instrumentation
 package main
 
 import (
@@ -16,6 +16,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/go-redis/redis/v8"
 	"github.com/joho/godotenv"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
 )
 
 // Contexto global para o Redis
@@ -32,42 +34,33 @@ type App struct {
 }
 
 func main() {
-	_ = godotenv.Load() // Carrega .env para dev local
+	_ = godotenv.Load()
 
-	// --- Configuração ---
+	shutdown := initTracer()
+	defer func() { _ = shutdown(context.Background()) }()
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8004"
 	}
-
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
 		log.Fatal("REDIS_URL deve ser definida (ex: redis://localhost:6379)")
 	}
-
 	flagSvcURL := os.Getenv("FLAG_SERVICE_URL")
 	if flagSvcURL == "" {
 		log.Fatal("FLAG_SERVICE_URL deve ser definida")
 	}
-
 	targetingSvcURL := os.Getenv("TARGETING_SERVICE_URL")
 	if targetingSvcURL == "" {
 		log.Fatal("TARGETING_SERVICE_URL deve ser definida")
 	}
-
-	// SQS é opcional no dev local, mas obrigatório em prod
 	sqsQueueURL := os.Getenv("AWS_SQS_URL")
 	awsRegion := os.Getenv("AWS_REGION")
-	if sqsQueueURL == "" {
-		log.Println("Atenção: AWS_SQS_URL não definida. Eventos não serão enviados.")
-	}
 	if awsRegion == "" && sqsQueueURL != "" {
 		log.Fatal("AWS_REGION deve ser definida para usar SQS")
 	}
 
-	// --- Inicializa Clientes ---
-	
-	// Cliente Redis
 	var rdb *redis.Client
 	if strings.HasPrefix(redisURL, "rediss://") {
 		u, err := url.Parse(redisURL)
@@ -92,13 +85,10 @@ func main() {
 	}
 	log.Println("Conectado ao Redis com sucesso!")
 
-	// Cliente SQS (AWS SDK)
 	var sqsSvc *sqs.SQS
 	awsEndpoint := os.Getenv("AWS_ENDPOINT_URL")
 	if sqsQueueURL != "" {
-		cfg := &aws.Config{
-			Region: aws.String(awsRegion),
-		}
+		cfg := &aws.Config{Region: aws.String(awsRegion)}
 		if awsEndpoint != "" {
 			cfg.Endpoint = aws.String(awsEndpoint)
 		}
@@ -110,12 +100,11 @@ func main() {
 		log.Println("Cliente SQS inicializado com sucesso.")
 	}
 
-	// Cliente HTTP (com timeout)
 	httpClient := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout:   5 * time.Second,
+		Transport: otelhttp.NewTransport(http.DefaultTransport),
 	}
 
-	// Cria a instância da App
 	app := &App{
 		RedisClient:         rdb,
 		SqsSvc:              sqsSvc,
@@ -125,13 +114,14 @@ func main() {
 		TargetingServiceURL: targetingSvcURL,
 	}
 
-	// --- Rotas ---
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", app.healthHandler)
 	mux.HandleFunc("/evaluate", app.evaluationHandler)
 
+	handler := otelhttp.NewHandler(mux, "evaluation-service")
+	_ = otel.Tracer("evaluation-service")
 	log.Printf("Serviço de Avaliação (Go) rodando na porta %s", port)
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
+	if err := http.ListenAndServe(":"+port, handler); err != nil {
 		log.Fatal(err)
 	}
 }

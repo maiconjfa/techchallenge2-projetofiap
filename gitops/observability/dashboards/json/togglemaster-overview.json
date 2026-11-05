@@ -1,0 +1,11 @@
+{
+  "id": null,
+  "uid": "togglemaster-overview",
+  "title": "ToggleMaster - Overview",
+  "tags": ["togglemaster", "observability"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "panels": []
+}

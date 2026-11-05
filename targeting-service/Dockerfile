@@ -3,13 +3,12 @@ FROM python:3.11-alpine AS builder
 RUN apk add --no-cache gcc musl-dev libffi-dev
 
 WORKDIR /app
-
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 FROM python:3.11-alpine
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN apk add --no-cache ca-certificates && addgroup -S appgroup && adduser -S appuser -G appgroup
 
 ENV PYTHONUNBUFFERED=1 \
     PATH=/home/appuser/.local/bin:$PATH
@@ -17,7 +16,7 @@ ENV PYTHONUNBUFFERED=1 \
 COPY --from=builder /root/.local /home/appuser/.local
 
 WORKDIR /app
-COPY . .
+COPY app.py otel.py ./
 
 USER appuser
 

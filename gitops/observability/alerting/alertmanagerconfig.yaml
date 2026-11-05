@@ -1,0 +1,54 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: alertmanager-selfhealing
+  namespace: observability
+  labels:
+    alertmanagerConfig: selfhealing
+spec:
+  route:
+    groupBy: ['alertname', 'service']
+    groupWait: 10s
+    groupInterval: 30s
+    repeatInterval: 1h
+    receiver: 'critical-all'
+    routes:
+      - matchers:
+          - name: alertname
+            value: AuthServiceHigh5xxRate
+        receiver: 'critical-all'
+  receivers:
+    - name: 'critical-all'
+      webhookConfigs:
+        - url: 'http://self-healing-webhook.self-healing.svc.cluster.local:8080/webhook'
+          sendResolved: false
+      pagerdutyConfigs:
+        - routingKey:
+            name: pagerduty-routing-key
+            key: key
+          severity: 'critical'
+          description: '[ToggleMaster] AuthServiceHigh5xxRate - Taxa de 5xx > 5%'
+          client: 'ToggleMaster'
+          clientURL: 'http://32.199.200.38:30124'
+      slackConfigs:
+        - apiURL:
+            name: slack-webhook-url
+            key: url
+          channel: '#togglemaster-alerts'
+          sendResolved: true
+          username: 'Alertmanager'
+          iconEmoji: ':rotating_light:'
+          title: '[CRÍTICO] {{ .CommonAnnotations.summary }}'
+          text: |-
+            *Alerta:* {{ .CommonAnnotations.summary }}
+            *Descrição:* {{ .CommonAnnotations.description }}
+            *Serviço:* auth-service
+            *Namespace:* feature-flags
+            *Severidade:* critical
+
+            *Ações Automáticas:*
+            • Self-Healing: kubectl rollout restart deployment/auth-service -n feature-flags (via webhook)
+            • Incidente: Aberto via PagerDuty
+            • ChatOps: Notificação enviada para #togglemaster-alerts
+
+            *Grafana:* http://32.199.200.38:30124

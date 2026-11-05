@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: self-healing-webhook
+  namespace: self-healing
+  labels:
+    app: self-healing-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: self-healing-webhook
+  template:
+    metadata:
+      labels:
+        app: self-healing-webhook
+    spec:
+      serviceAccountName: self-healing-sa
+      containers:
+        - name: webhook
+          image: 248530551510.dkr.ecr.us-east-1.amazonaws.com/togglemaster-self-healing-webhook:v1.0.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5

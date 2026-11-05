@@ -1,0 +1,34 @@
+###############################################################################
+# ArgoCD Application: self-healing-webhook
+###############################################################################
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: self-healing-webhook
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/maiconjfa/techchallenge2-projetofiap.git
+    targetRevision: main
+    path: gitops/self-healing
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: self-healing
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 2m

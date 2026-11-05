@@ -66,6 +66,22 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: AWS_REGION
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector-opentelemetry-collector.observability.svc.cluster.local:4317
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: grpc
+            - name: OTEL_SERVICE_NAME
+              value: evaluation-service
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: service.namespace=feature-flags,deployment.environment=demo
+            - name: OTEL_TRACES_SAMPLER
+              value: parentbased_traceidratio
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: "1.0"
+            - name: OTEL_METRICS_EXPORTER
+              value: otlp
+            - name: OTEL_LOGS_EXPORTER
+              value: otlp
           resources:
             requests:
               cpu: "128m"
