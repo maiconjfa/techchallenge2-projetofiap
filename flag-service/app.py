@@ -99,10 +99,10 @@ def get_flag(flag_name):
     conn = cur = None
     try:
         conn = pool.getconn(); cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute('SELECT * FROM flags WHERE name = %s', (flag_name,))
+        cur.execute('SELECT * FROM flags WHERE key = %s', (flag_name,))
         row = cur.fetchone()
         if not row: return jsonify({'error':'not found'}), 404
-        return jsonify(row), 200
+        row['name']=row.get('key'); row['is_enabled']=row.get('enabled'); return jsonify(row), 200
     except Exception as e:
         log.error(f'get_flag: {e}'); return jsonify({'error':'internal'}), 500
     finally:
