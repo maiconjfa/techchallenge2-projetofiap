@@ -55,7 +55,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
-                  key: DATABASE_URL
+                  key: DATABASE_URL_AUTH
             - name: MASTER_KEY
               valueFrom:
                 secretKeyRef:
