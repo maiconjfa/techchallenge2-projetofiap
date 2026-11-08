@@ -46,10 +46,6 @@ spec:
               value: otlp
             - name: OTEL_LOGS_EXPORTER
               value: otlp
-          ports:
-            - containerPort: 8001
-              protocol: TCP
-          env:
             - name: PORT
               valueFrom:
                 configMapKeyRef:
@@ -59,12 +55,15 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
-                  key: DATABASE_URL_AUTH
+                  key: DATABASE_URL
             - name: MASTER_KEY
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
                   key: MASTER_KEY
+          ports:
+            - containerPort: 8001
+              protocol: TCP
           resources:
             requests:
               cpu: "128m"

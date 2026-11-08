@@ -24,9 +24,10 @@ spec:
     namespace: observability
 
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
+    # automated sync disabled to preserve live datadog/connector + Service Map config during demo
+    # automated:
+    #   prune: true
+    #   selfHeal: true
     syncOptions:
       - CreateNamespace=true
     retry:

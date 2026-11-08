@@ -18,7 +18,7 @@ spec:
       serviceAccountName: self-healing-sa
       containers:
         - name: webhook
-          image: 248530551510.dkr.ecr.us-east-1.amazonaws.com/togglemaster-self-healing-webhook:v1.0.0
+          image: 248530551510.dkr.ecr.us-east-1.amazonaws.com/togglemaster-self-healing-webhook:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
