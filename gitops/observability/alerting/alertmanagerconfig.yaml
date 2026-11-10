@@ -26,10 +26,11 @@ spec:
         - routingKey:
             name: pagerduty-routing-key
             key: key
-          severity: 'critical'
-          description: '[ToggleMaster] AuthServiceHigh5xxRate - Taxa de 5xx > 5%'
+          sendResolved: true
+          severity: '{{ if eq .Status "resolved" }}info{{ else }}critical{{ end }}'
+          description: '[ToggleMaster] {{ .CommonLabels.alertname }} - {{ .Status | toUpper }} | {{ .CommonAnnotations.summary }}'
           client: 'ToggleMaster'
-          clientURL: 'http://32.199.200.38:30124'
+          clientURL: 'http://34.229.45.189:30124'
       slackConfigs:
         - apiURL:
             name: slack-webhook-url
@@ -37,18 +38,24 @@ spec:
           channel: '#togglemaster-alerts'
           sendResolved: true
           username: 'Alertmanager'
-          iconEmoji: ':rotating_light:'
-          title: '[CRÍTICO] {{ .CommonAnnotations.summary }}'
+          iconEmoji: '{{ if eq .Status "resolved" }}:white_check_mark:{{ else }}:rotating_light:{{ end }}'
+          title: '{{ if eq .Status "resolved" }}[RESOLVIDO]{{ else }}[CRÍTICO]{{ end }} {{ .CommonAnnotations.summary }}'
           text: |-
-            *Alerta:* {{ .CommonAnnotations.summary }}
-            *Descrição:* {{ .CommonAnnotations.description }}
-            *Serviço:* auth-service
-            *Namespace:* feature-flags
-            *Severidade:* critical
+            *Status:* {{ .Status | toUpper }}
+            *Alerta:* {{ .CommonLabels.alertname }}
+            *Motivo/Causa:* {{ .CommonAnnotations.description }}
+            *Resumo:* {{ .CommonAnnotations.summary }}
+            *Serviço:* {{ .CommonLabels.service }}
+            *Namespace:* {{ .CommonLabels.namespace }}
+            *Severidade (alerta):* {{ .CommonLabels.severity }}
 
+            {{ if eq .Status "resolved" -}}
+            *Situação:* Serviço restabelecido. Incidente/alerta resolvido e notificado no PagerDuty/Slack.
+            {{- else -}}
             *Ações Automáticas:*
-            • Self-Healing: kubectl rollout restart deployment/auth-service -n feature-flags (via webhook)
-            • Incidente: Aberto via PagerDuty
+            • Self-Healing: kubectl rollout restart deployment/{{ .CommonLabels.service }} -n feature-flags (via webhook)
+            • Incidente: Aberto/atualizado via PagerDuty
             • ChatOps: Notificação enviada para #togglemaster-alerts
+            {{- end }}
 
-            *Grafana:* http://32.199.200.38:30124
+            *Grafana:* http://34.229.45.189:30124/alerting/list

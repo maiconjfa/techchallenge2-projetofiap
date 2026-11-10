@@ -355,6 +355,41 @@
       ],
       "title": "Logs (feature-flags)",
       "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "id": 8,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "expr": "{namespace=~\"self-healing|observability\"} |~ \"Received|restarted|AuthServiceHigh5xxRate|error|resolved|webhook\" | line_format \"{{.namespace}} {{.pod}} {{__line__}}\"",
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
+        }
+      ],
+      "title": "Logs de incidente/self-healing (webhook, alertas, motivo)",
+      "type": "logs"
     }
   ],
   "refresh": "30s",
@@ -375,6 +410,6 @@
   "timezone": "browser",
   "title": "ToggleMaster - Overview",
   "uid": "togglemaster-overview",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }

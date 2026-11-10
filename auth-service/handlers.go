@@ -5,6 +5,10 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
+
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Estrutura para o corpo da requisição de criação de chave
@@ -124,3 +128,22 @@ func (a *App) masterKeyAuthMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// demoErrorHandler retorna 500 proposital (demo controlada) com log estruturado e erro no span OTel/Datadog APM.
+// Proteção: requer header X-Demo-Error: 1 ou query ?demo=1.
+func (a *App) demoErrorHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("X-Demo-Error") != "1" && r.URL.Query().Get("demo") != "1" {
+		http.Error(w, "endpoint de demo desabilitado; use X-Demo-Error: 1 ou ?demo=1", http.StatusNotFound)
+		return
+	}
+	msg := "demo error 500 proposital: falha simulada no auth-service para evidencia Datadog APM/logs"
+	log.Printf("level=error service=auth-service route=/demo/error500 status=500 msg=%q ts=%s", msg, time.Now().UTC().Format(time.RFC3339))
+	span := trace.SpanFromContext(r.Context())
+	span.SetStatus(codes.Error, msg)
+	span.RecordError(&demoErr{s: msg})
+	http.Error(w, msg, http.StatusInternalServerError)
+}
+
+type demoErr struct{ s string }
+
+func (e *demoErr) Error() string { return e.s }
